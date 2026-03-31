@@ -10,6 +10,7 @@ This spec is written to be:
 - **Cost-conscious**: minimize database writes, avoid always-on services, and lean on caching and client-side logic.
 - **Next.js-aligned**: prefer **Next.js Server Actions** for backend operations when needed.
 - **Supabase-backed**: Supabase is the durable store for shared artifacts (published cases, templates, submissions).
+- **Navigation**: recommended app shell and Next.js routes are described under **Information architecture** (below).
 
 ## Non-goals (Prototype Alpha)
 
@@ -60,9 +61,100 @@ This spec is written to be:
 - Autosave progress locally; resumable across reloads.
 - Submit final responses; persist submission to Supabase when available.
 
+## Information architecture
+
+This section describes **where** author and student experiences live in the UI and **which routes** should own them. It complements **Prototype Alpha user journeys** (behavior) and **Data contracts** (documents). JSON types remain the source of truth; routes are **views** over those documents.
+
+### Principles
+
+- **Persona-first areas**: separate **Author** and **Student** workspaces so navigation and mental models stay clear (see Security and data policy for simplest-possible separation).
+- **Deep-linkable artifacts**: case studies, **assessment templates** (WDL is one supported format), and in-progress submissions should be addressable by stable IDs in the URL where it improves recovery and sharing (fits local-first persistence and resumability).
+- **Explicit sync surfaces**: “Publish” and “Submit” remain **deliberate actions** on screens tied to those artifacts—not only in global chrome.
+- **Synthetic-data visibility**: persistent or prominent **mock / synthetic data only** messaging at the app shell level (cross-reference Security and data policy).
+
+### App shell
+
+The root layout is conceptually divided into:
+
+| Region | Role |
+| --- | --- |
+| **Global notice** | Mock-data disclaimer |
+| **Primary nav** | Persona/workspace switch (Author vs Student), home |
+| **Main** | Page content; optional **secondary nav** (tabs or sidebar) for multi-section authoring |
+
+Long **case study authoring** flows (journeys A and B) benefit from **section navigation** (tabs or vertical nav) within a single case study editor rather than many top-level routes. Optional sub-routes or a `?step=` query may be used for bookmarking; the editor route remains the primary shell.
+
+### Routes and pages (Next.js App Router)
+
+Implementation should follow the **[Next.js App Router](https://nextjs.org/docs/app)** (`app/` directory): **route groups** (parentheses; no URL segment) may separate author vs student layouts, and **dynamic segments** identify artifacts (e.g. `[caseStudyId]`, `[templateId]`, `[submissionId]`).
+
+**Nomenclature**: Information architecture uses **assessments** as the capability (authoring templates, student attempts, submit). **WDL** (“Within Defined Limits”) remains an assessment *format* in schema and JSON types (`WdlAssessmentTemplate`, etc.); URLs and navigation should not imply WDL is the only kind of assessment.
+
+**Recommended URL structure:**
+
+```mermaid
+flowchart TB
+  root["/"]
+  author["/author"]
+  authorCaseStudies["/author/case-studies"]
+  authorCase["/author/case-studies/[caseStudyId]"]
+  authorAssess["/author/assessments"]
+  authorAssessId["/author/assessments/[templateId]"]
+  student["/student"]
+  studentCaseStudies["/student/case-studies"]
+  studentCase["/student/case-studies/[caseStudyId]"]
+  studentAssess["/student/case-studies/[caseStudyId]/assessments/[templateId]"]
+  root --> author
+  root --> student
+  author --> authorCaseStudies
+  authorCaseStudies --> authorCase
+  author --> authorAssess
+  authorAssess --> authorAssessId
+  student --> studentCaseStudies
+  studentCaseStudies --> studentCase
+  studentCase --> studentAssess
+```
+
+- **`/`**: Landing with two clear entry points (**Author workspace**, **Student workspace**).
+- **Author**
+  - `/author`: Author hub (recent drafts, shortcuts to new case study or assessment templates).
+  - `/author/case-studies`: List local and synced case studies (draft vs published reflected in UI as needed).
+  - `/author/case-studies/[caseStudyId]`: **Case study editor**: guided forms (demographics, summary, timeline, attachments); **Generate** / **Improve** per section (journeys A and B); **Publish** action.
+  - `/author/assessments`: List assessment templates; creating new may require or suggest a `caseStudyId` (journey C). Templates may use WDL or other formats over time.
+  - `/author/assessments/[templateId]`: Assessment template builder (domains, items, response types, constraints); **Publish** action.
+- **Student**
+  - `/student`: Student hub (resume in-progress work, browse published case studies).
+  - `/student/case-studies`: Browse **published** case studies available to run.
+  - `/student/case-studies/[caseStudyId]`: Read-only case presentation (e.g. timeline).
+  - `/student/case-studies/[caseStudyId]/assessments/[templateId]`: Run an assessment: fill, local autosave, **Submit** (journey D).
+
+**Implementation notes**
+
+- Route groups such as `app/(author)/...` and `app/(student)/...` can provide different nested layouts (e.g. author sidebar vs simpler student layout) without changing the URLs above.
+- **Server Actions** for publish and submit align with Architecture constraints; colocate actions with features or place them under `app/actions/` as preferred—feature-local actions are a reasonable default.
+- Parallel routes and intercepting routes for modal-heavy flows are **optional** and can be deferred (see Open questions).
+
+### Journey mapping
+
+| Journey | Primary routes | Key actions |
+| --- | --- | --- |
+| **A** (manual case study) | `/author/case-studies`, `/author/case-studies/[caseStudyId]` | Debounced local autosave; **Publish** |
+| **B** (prompt-assisted case study) | Same as A | Structured patch review/apply; provenance; **Publish** |
+| **C** (assessment template for a case) | `/author/case-studies` (select case), `/author/assessments`, `/author/assessments/[templateId]` | Local save; **Publish** template |
+| **D** (complete assessment) | `/student/case-studies`, `/student/case-studies/[caseStudyId]`, `/student/case-studies/[caseStudyId]/assessments/[templateId]` | Local autosave; **Submit** |
+
+### Future considerations
+
+If draft documents outgrow **localStorage**, the same routes and views apply; only the client storage tier changes (e.g. IndexedDB) per Local-first drafts, sync, and caching.
+
+### What this section does not specify
+
+- **API routes vs Server Actions**: only high-level alignment with Architecture constraints—pages and layouts are the focus here.
+- **Full UI design**: not a visual or component-level mock; enough detail to implement routing and shells consistently.
+
 ## Architecture constraints (implementation guidance, not mandates)
 
-- **Preferred backend shape**: Next.js Server Actions for “publish/sync/submit” operations.
+- **Preferred backend shape**: Next.js Server Actions for “publish/sync/submit” operations (see **Information architecture** for how feature routes relate).
 - **Client-heavy**: editing, validation, and draft autosave run in the browser.
 - **Caching**:
   - Client caches case study documents/templates by `id` + `updatedAt` (or `contentHash`).
@@ -478,6 +570,7 @@ This section describes **what** we need to store, not the exact table design.
 
 ## Open questions (intentionally deferred)
 
+- Next.js parallel routes or intercepting routes for modal-heavy flows (optional; IA defers this).
 - Formal JSON Schema publication and validation rules (we’ll keep v0.1 illustrative, then harden later).
 - Alignment strategy with FHIR resources (mapping table vs direct embedding).
 - Scoring/rubrics, faculty review workflows, and analytics.
