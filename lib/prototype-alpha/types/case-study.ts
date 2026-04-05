@@ -88,15 +88,14 @@ export type CaseStudyAssessments = {
   [key: string]: unknown;
 };
 
-/** Resolves linked templates; supports legacy `wdlTemplates` key in stored JSON. */
+/** Returns linked assessment templates from case study assessments data. */
 export function linkedAssessmentTemplates(
   assessments: CaseStudyAssessments | undefined,
 ): AssessmentTemplateRef[] {
   if (!assessments) {
     return [];
   }
-  const legacy = assessments as { wdlTemplates?: AssessmentTemplateRef[] };
-  return assessments.assessmentTemplates ?? legacy.wdlTemplates ?? [];
+  return assessments.assessmentTemplates ?? [];
 }
 
 export type CaseStudyAttachment = {
