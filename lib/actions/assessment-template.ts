@@ -3,28 +3,28 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  WDL_TEMPLATE_SCHEMA_VERSION,
-  type WdlAssessmentTemplate,
-} from "@/lib/prototype-alpha/types/wdl-template";
+  ASSESSMENT_TEMPLATE_SCHEMA_VERSION,
+  type AssessmentTemplate,
+} from "@/lib/prototype-alpha/types/assessment-template";
 
 const publishSchema = z.object({
-  document: z.custom<WdlAssessmentTemplate>(),
+  document: z.custom<AssessmentTemplate>(),
   clientUpdatedAt: z.string(),
 });
 
-export type PublishWdlTemplateResult =
+export type PublishAssessmentTemplateResult =
   | { ok: true; updatedAt: string }
   | { ok: false; code: "stale" | "config" | "db"; message: string };
 
-export async function publishWdlTemplate(
+export async function publishAssessmentTemplate(
   input: z.infer<typeof publishSchema>,
-): Promise<PublishWdlTemplateResult> {
+): Promise<PublishAssessmentTemplateResult> {
   const parsed = publishSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, code: "config", message: "Invalid payload" };
   }
   const { document, clientUpdatedAt } = parsed.data;
-  if (document.schemaVersion !== WDL_TEMPLATE_SCHEMA_VERSION) {
+  if (document.schemaVersion !== ASSESSMENT_TEMPLATE_SCHEMA_VERSION) {
     return { ok: false, code: "config", message: "Unsupported schema version" };
   }
 
@@ -39,7 +39,7 @@ export async function publishWdlTemplate(
   }
 
   const { data: row, error: fetchError } = await supabase
-    .from("wdl_templates")
+    .from("assessment_templates")
     .select("document")
     .eq("id", document.id)
     .maybeSingle();
@@ -49,7 +49,7 @@ export async function publishWdlTemplate(
   }
 
   if (row) {
-    const serverDoc = row.document as WdlAssessmentTemplate;
+    const serverDoc = row.document as AssessmentTemplate;
     const serverUpdated = serverDoc.updatedAt;
     if (serverUpdated && new Date(clientUpdatedAt) < new Date(serverUpdated)) {
       return {
@@ -60,13 +60,13 @@ export async function publishWdlTemplate(
     }
   }
 
-  const toSave: WdlAssessmentTemplate = {
+  const toSave: AssessmentTemplate = {
     ...document,
     status: "published",
     updatedAt: new Date().toISOString(),
   };
 
-  const { error: upsertError } = await supabase.from("wdl_templates").upsert(
+  const { error: upsertError } = await supabase.from("assessment_templates").upsert(
     {
       id: toSave.id,
       case_study_id: toSave.caseStudyId ?? null,
@@ -85,25 +85,25 @@ export async function publishWdlTemplate(
   return { ok: true, updatedAt: toSave.updatedAt };
 }
 
-export async function getPublishedWdlTemplate(
+export async function getPublishedAssessmentTemplate(
   id: string,
-): Promise<WdlAssessmentTemplate | null> {
+): Promise<AssessmentTemplate | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
     return null;
   }
   const { data, error } = await supabase
-    .from("wdl_templates")
+    .from("assessment_templates")
     .select("document")
     .eq("id", id)
     .maybeSingle();
   if (error || !data) {
     return null;
   }
-  return data.document as WdlAssessmentTemplate;
+  return data.document as AssessmentTemplate;
 }
 
-export async function listPublishedWdlTemplates(): Promise<
+export async function listPublishedAssessmentTemplates(): Promise<
   Array<{
     id: string;
     title: string;
@@ -117,7 +117,7 @@ export async function listPublishedWdlTemplates(): Promise<
     return [];
   }
   const { data, error } = await supabase
-    .from("wdl_templates")
+    .from("assessment_templates")
     .select("id, title, case_study_id, updated_at, status")
     .eq("status", "published")
     .order("updated_at", { ascending: false });

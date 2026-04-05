@@ -4,15 +4,15 @@ const PREFIX = "sim-ehr:prototype-alpha:";
 
 export type StorageNamespace =
   | "case-study-draft"
-  | "wdl-template-draft"
-  | "wdl-submission";
+  | "assessment-template-draft"
+  | "assessment-submission";
 
 function key(ns: StorageNamespace, id: string): string {
   return `${PREFIX}${ns}:${id}`;
 }
 
 function submissionKey(caseStudyId: string, templateId: string): string {
-  return `${PREFIX}wdl-submission:${caseStudyId}:${templateId}`;
+  return `${PREFIX}assessment-submission:${caseStudyId}:${templateId}`;
 }
 
 function normalizeMeta(
@@ -119,7 +119,7 @@ export function listSubmissionKeys(): Array<{ caseStudyId: string; templateId: s
   if (typeof window === "undefined") {
     return [];
   }
-  const p = `${PREFIX}wdl-submission:`;
+  const p = `${PREFIX}assessment-submission:`;
   const out: Array<{ caseStudyId: string; templateId: string }> = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);

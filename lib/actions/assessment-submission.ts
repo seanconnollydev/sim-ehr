@@ -3,28 +3,28 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  WDL_SUBMISSION_SCHEMA_VERSION,
-  type WdlAssessmentSubmission,
-} from "@/lib/prototype-alpha/types/wdl-submission";
+  ASSESSMENT_SUBMISSION_SCHEMA_VERSION,
+  type AssessmentSubmission,
+} from "@/lib/prototype-alpha/types/assessment-submission";
 
 const submitSchema = z.object({
-  document: z.custom<WdlAssessmentSubmission>(),
+  document: z.custom<AssessmentSubmission>(),
   clientUpdatedAt: z.string(),
 });
 
-export type SubmitWdlResult =
+export type SubmitAssessmentResult =
   | { ok: true; updatedAt: string; submittedAt: string }
   | { ok: false; code: "stale" | "config" | "db"; message: string };
 
-export async function submitWdlAssessment(
+export async function submitAssessment(
   input: z.infer<typeof submitSchema>,
-): Promise<SubmitWdlResult> {
+): Promise<SubmitAssessmentResult> {
   const parsed = submitSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, code: "config", message: "Invalid payload" };
   }
   const { document, clientUpdatedAt } = parsed.data;
-  if (document.schemaVersion !== WDL_SUBMISSION_SCHEMA_VERSION) {
+  if (document.schemaVersion !== ASSESSMENT_SUBMISSION_SCHEMA_VERSION) {
     return { ok: false, code: "config", message: "Unsupported schema version" };
   }
 
@@ -39,7 +39,7 @@ export async function submitWdlAssessment(
   }
 
   const { data: row, error: fetchError } = await supabase
-    .from("wdl_submissions")
+    .from("assessment_submissions")
     .select("document")
     .eq("id", document.id)
     .maybeSingle();
@@ -49,7 +49,7 @@ export async function submitWdlAssessment(
   }
 
   if (row) {
-    const serverDoc = row.document as WdlAssessmentSubmission;
+    const serverDoc = row.document as AssessmentSubmission;
     const serverUpdated = serverDoc.updatedAt;
     if (serverUpdated && new Date(clientUpdatedAt) < new Date(serverUpdated)) {
       return {
@@ -61,14 +61,14 @@ export async function submitWdlAssessment(
   }
 
   const submittedAt = new Date().toISOString();
-  const toSave: WdlAssessmentSubmission = {
+  const toSave: AssessmentSubmission = {
     ...document,
     status: "submitted",
     submittedAt,
     updatedAt: submittedAt,
   };
 
-  const { error: upsertError } = await supabase.from("wdl_submissions").upsert(
+  const { error: upsertError } = await supabase.from("assessment_submissions").upsert(
     {
       id: toSave.id,
       case_study_id: toSave.caseStudyId,

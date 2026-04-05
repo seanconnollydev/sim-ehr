@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { toast } from "sonner";
-import { submitWdlAssessment } from "@/lib/actions/wdl-submission";
-import { useLocalWdlSubmission } from "@/lib/prototype-alpha/hooks/use-local-wdl-submission";
+import { submitAssessment } from "@/lib/actions/assessment-submission";
+import { useLocalAssessmentSubmission } from "@/lib/prototype-alpha/hooks/use-local-assessment-submission";
 import { nowIso } from "@/lib/prototype-alpha/ids";
-import type { WdlAssessmentTemplate } from "@/lib/prototype-alpha/types/wdl-template";
-import type { WdlItemResponse } from "@/lib/prototype-alpha/types/wdl-submission";
+import type { AssessmentTemplate } from "@/lib/prototype-alpha/types/assessment-template";
+import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -25,16 +25,16 @@ import { Badge } from "@/components/ui/badge";
 type Props = {
   caseStudyId: string;
   templateId: string;
-  template: WdlAssessmentTemplate;
+  template: AssessmentTemplate;
 };
 
-export function WdlAssessmentRunner({
+export function AssessmentRunner({
   caseStudyId,
   templateId,
   template,
 }: Props) {
   const { document, meta, setDocument, markSynced, setSyncError, hydrated } =
-    useLocalWdlSubmission(caseStudyId, templateId);
+    useLocalAssessmentSubmission(caseStudyId, templateId);
 
   const clientUpdatedAtForSubmit = useMemo(
     () => meta?.syncedBasisAt ?? document?.updatedAt ?? "",
@@ -50,7 +50,7 @@ export function WdlAssessmentRunner({
       return;
     }
     setSyncError(null);
-    const res = await submitWdlAssessment({
+    const res = await submitAssessment({
       document,
       clientUpdatedAt: clientUpdatedAtForSubmit || document.updatedAt,
     });
@@ -69,7 +69,7 @@ export function WdlAssessmentRunner({
     }
   }
 
-  function setResponse(itemId: string, value: WdlItemResponse["value"]) {
+  function setResponse(itemId: string, value: AssessmentItemResponse["value"]) {
     setDocument((d) => ({
       ...d,
       responses: {

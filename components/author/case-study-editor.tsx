@@ -7,8 +7,11 @@ import { publishCaseStudy } from "@/lib/actions/case-study";
 import { deepMerge } from "@/lib/prototype-alpha/merge";
 import { useLocalCaseStudy } from "@/lib/prototype-alpha/hooks/use-local-case-study";
 import { newId } from "@/lib/prototype-alpha/ids";
-import type { CaseStudyDocument } from "@/lib/prototype-alpha/types/case-study";
-import type { CaseStudyTimelineEntry } from "@/lib/prototype-alpha/types/case-study";
+import {
+  type CaseStudyDocument,
+  type CaseStudyTimelineEntry,
+  linkedAssessmentTemplates,
+} from "@/lib/prototype-alpha/types/case-study";
 import { PromptPatchDialog } from "@/components/author/prompt-patch-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -460,7 +463,7 @@ export function CaseStudyEditor({ caseStudyId }: Props) {
 
         <TabsContent value="assessments" className="space-y-4">
           <p className="text-muted-foreground text-sm">
-            Linked WDL templates (for student navigation). Manage templates in{" "}
+            Linked assessment templates (for student navigation). Manage templates in{" "}
             <Link href="/author/assessments" className="underline">
               Assessments
             </Link>
@@ -471,16 +474,16 @@ export function CaseStudyEditor({ caseStudyId }: Props) {
             type="button"
             variant="outline"
             onClick={() => {
-              const templateId = `wdl_tpl_${newId()}`;
+              const templateId = `assessment_tpl_${newId()}`;
               setDocument((d) => ({
                 ...d,
                 assessments: {
                   ...d.assessments,
-                  wdlTemplates: [
-                    ...(d.assessments?.wdlTemplates ?? []),
+                  assessmentTemplates: [
+                    ...linkedAssessmentTemplates(d.assessments),
                     {
                       templateId,
-                      label: "New WDL template",
+                      label: "New assessment template",
                       x_defaultForStudents: false,
                     },
                   ],
@@ -491,7 +494,7 @@ export function CaseStudyEditor({ caseStudyId }: Props) {
             Add template reference
           </Button>
           <ul className="list-inside list-disc space-y-1 text-sm">
-            {(document.assessments?.wdlTemplates ?? []).map((w) => (
+            {linkedAssessmentTemplates(document.assessments).map((w) => (
               <li key={w.templateId}>
                 <Link
                   href={`/author/assessments/${w.templateId}`}

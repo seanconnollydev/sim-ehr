@@ -1,8 +1,8 @@
-export const WDL_SUBMISSION_SCHEMA_VERSION = "wdlSubmission@0.1" as const;
+export const ASSESSMENT_SUBMISSION_SCHEMA_VERSION = "assessmentSubmission@0.1" as const;
 
-export type WdlSubmissionStatus = "in_progress" | "submitted";
+export type AssessmentSubmissionStatus = "in_progress" | "submitted";
 
-export type WdlResponseValue =
+export type AssessmentResponseValue =
   | boolean
   | string
   | string[]
@@ -10,13 +10,13 @@ export type WdlResponseValue =
   | null
   | undefined;
 
-export type WdlItemResponse = {
-  value?: WdlResponseValue;
+export type AssessmentItemResponse = {
+  value?: AssessmentResponseValue;
   [key: string]: unknown;
 };
 
-export type WdlAssessmentSubmission = {
-  schemaVersion: typeof WDL_SUBMISSION_SCHEMA_VERSION;
+export type AssessmentSubmission = {
+  schemaVersion: typeof ASSESSMENT_SUBMISSION_SCHEMA_VERSION;
   id: string;
   caseStudyId: string;
   templateId: string;
@@ -29,21 +29,21 @@ export type WdlAssessmentSubmission = {
   startedAt: string;
   updatedAt: string;
   submittedAt: string | null;
-  status: WdlSubmissionStatus;
-  responses: Record<string, WdlItemResponse>;
+  status: AssessmentSubmissionStatus;
+  responses: Record<string, AssessmentItemResponse>;
   x_extensions?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
-export function emptyWdlSubmission(
+export function emptyAssessmentSubmission(
   id: string,
   caseStudyId: string,
   templateId: string,
   studentActorId: string,
-): WdlAssessmentSubmission {
+): AssessmentSubmission {
   const t = new Date().toISOString();
   return {
-    schemaVersion: WDL_SUBMISSION_SCHEMA_VERSION,
+    schemaVersion: ASSESSMENT_SUBMISSION_SCHEMA_VERSION,
     id,
     caseStudyId,
     templateId,

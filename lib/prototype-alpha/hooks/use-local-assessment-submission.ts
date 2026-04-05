@@ -8,9 +8,9 @@ import {
   writeSubmission,
 } from "../local-storage";
 import {
-  emptyWdlSubmission,
-  type WdlAssessmentSubmission,
-} from "../types/wdl-submission";
+  emptyAssessmentSubmission,
+  type AssessmentSubmission,
+} from "../types/assessment-submission";
 import { newId, nowIso } from "../ids";
 
 const STUDENT_KEY = "sim-ehr:student-actor-id";
@@ -27,12 +27,12 @@ function getStudentActorId(): string {
   return id;
 }
 
-export function useLocalWdlSubmission(
+export function useLocalAssessmentSubmission(
   caseStudyId: string | undefined,
   templateId: string | undefined,
 ) {
   const [wrapped, setWrapped] = useState<{
-    document: WdlAssessmentSubmission;
+    document: AssessmentSubmission;
     meta: import("../types/local-meta").LocalDocumentMeta;
   } | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -41,7 +41,7 @@ export function useLocalWdlSubmission(
     () =>
       debounce(
         (
-          doc: WdlAssessmentSubmission,
+          doc: AssessmentSubmission,
           meta: import("../types/local-meta").LocalDocumentMeta,
         ) => {
           if (!caseStudyId || !templateId) {
@@ -64,7 +64,7 @@ export function useLocalWdlSubmission(
       return;
     }
     queueMicrotask(() => {
-      const existing = readSubmission<WdlAssessmentSubmission>(
+      const existing = readSubmission<AssessmentSubmission>(
         caseStudyId,
         templateId,
       );
@@ -72,8 +72,8 @@ export function useLocalWdlSubmission(
         setWrapped(existing);
       } else {
         const actorId = getStudentActorId();
-        const doc = emptyWdlSubmission(
-          `wdl_sub_${newId()}`,
+        const doc = emptyAssessmentSubmission(
+          `assessment_sub_${newId()}`,
           caseStudyId,
           templateId,
           actorId,
@@ -90,7 +90,7 @@ export function useLocalWdlSubmission(
   }, [caseStudyId, templateId, saveDebounced]);
 
   const setDocument = useCallback(
-    (updater: (prev: WdlAssessmentSubmission) => WdlAssessmentSubmission) => {
+    (updater: (prev: AssessmentSubmission) => AssessmentSubmission) => {
       setWrapped((w) => {
         if (!w || !caseStudyId || !templateId) {
           return w;

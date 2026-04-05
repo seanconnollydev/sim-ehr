@@ -1,6 +1,6 @@
-export const WDL_TEMPLATE_SCHEMA_VERSION = "wdlTemplate@0.1" as const;
+export const ASSESSMENT_TEMPLATE_SCHEMA_VERSION = "assessmentTemplate@0.1" as const;
 
-export type WdlTemplateStatus = "draft" | "published";
+export type AssessmentTemplateStatus = "draft" | "published";
 
 export type DefinedLimits =
   | { type: "numericRange"; unit?: string; min?: number; max?: number; [key: string]: unknown }
@@ -9,37 +9,37 @@ export type DefinedLimits =
   | { type: "none"; [key: string]: unknown }
   | Record<string, unknown>;
 
-export type WdlChoice = {
+export type AssessmentChoice = {
   id: string;
   label: string;
   [key: string]: unknown;
 };
 
-export type WdlResponseType =
+export type AssessmentResponseType =
   | "boolean"
   | "choice"
   | "multiChoice"
   | "text"
   | string;
 
-export type WdlDomain = {
+export type AssessmentDomain = {
   id: string;
   label: string;
   [key: string]: unknown;
 };
 
-export type WdlItem = {
+export type AssessmentItem = {
   id: string;
   domainId?: string;
   prompt: string;
-  responseType: WdlResponseType;
+  responseType: AssessmentResponseType;
   definedLimits?: DefinedLimits;
-  choices?: WdlChoice[];
+  choices?: AssessmentChoice[];
   [key: string]: unknown;
 };
 
-export type WdlAssessmentTemplate = {
-  schemaVersion: typeof WDL_TEMPLATE_SCHEMA_VERSION;
+export type AssessmentTemplate = {
+  schemaVersion: typeof ASSESSMENT_TEMPLATE_SCHEMA_VERSION;
   id: string;
   title: string;
   description?: string;
@@ -47,9 +47,9 @@ export type WdlAssessmentTemplate = {
   caseStudyId?: string;
   createdAt: string;
   updatedAt: string;
-  status: WdlTemplateStatus;
-  domains: WdlDomain[];
-  items: WdlItem[];
+  status: AssessmentTemplateStatus;
+  domains: AssessmentDomain[];
+  items: AssessmentItem[];
   provenance?: {
     authoredBy?: { actorType: string; actorId?: string; [key: string]: unknown };
     [key: string]: unknown;
@@ -58,11 +58,11 @@ export type WdlAssessmentTemplate = {
   [key: string]: unknown;
 };
 
-export function emptyWdlTemplate(id: string): WdlAssessmentTemplate {
+export function emptyAssessmentTemplate(id: string): AssessmentTemplate {
   const t = new Date().toISOString();
   const domDefault = { id: "dom_default", label: "General" };
   return {
-    schemaVersion: WDL_TEMPLATE_SCHEMA_VERSION,
+    schemaVersion: ASSESSMENT_TEMPLATE_SCHEMA_VERSION,
     id,
     title: "Untitled assessment",
     createdAt: t,

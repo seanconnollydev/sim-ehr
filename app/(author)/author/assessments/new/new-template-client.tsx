@@ -10,7 +10,7 @@ export function NewTemplateRedirect() {
   const caseStudyId = searchParams.get("caseStudyId");
 
   useEffect(() => {
-    const id = `wdl_tpl_${newId()}`;
+    const id = `assessment_tpl_${newId()}`;
     const q = caseStudyId
       ? `?caseStudyId=${encodeURIComponent(caseStudyId)}`
       : "";

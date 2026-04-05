@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPublishedCaseStudy } from "@/lib/actions/case-study";
+import { linkedAssessmentTemplates } from "@/lib/prototype-alpha/types/case-study";
 import { CaseStudyReadonly } from "@/components/student/case-study-readonly";
 import { Button } from "@/components/ui/button";
 
@@ -13,7 +14,7 @@ export default async function StudentCaseStudyPage({ params }: Props) {
     notFound();
   }
 
-  const templates = doc.assessments?.wdlTemplates ?? [];
+  const templates = linkedAssessmentTemplates(doc.assessments);
 
   return (
     <div className="space-y-8">

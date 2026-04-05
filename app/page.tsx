@@ -26,7 +26,7 @@ export default function HomePage() {
             <CardTitle>Author workspace</CardTitle>
             <CardDescription>
               Create case studies, use guided forms and optional AI-assisted
-              drafting, and configure WDL assessments.
+              drafting, and configure assessments.
             </CardDescription>
           </CardHeader>
           <CardContent>

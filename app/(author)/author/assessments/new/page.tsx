@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { NewTemplateRedirect } from "./new-template-client";
 
-export default function NewWdlTemplatePage() {
+export default function NewAssessmentTemplatePage() {
   return (
     <Suspense
       fallback={

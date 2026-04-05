@@ -9,16 +9,16 @@ import {
   type StorageNamespace,
 } from "../local-storage";
 import {
-  emptyWdlTemplate,
-  type WdlAssessmentTemplate,
-} from "../types/wdl-template";
+  emptyAssessmentTemplate,
+  type AssessmentTemplate,
+} from "../types/assessment-template";
 import { nowIso } from "../ids";
 
-const NS: StorageNamespace = "wdl-template-draft";
+const NS: StorageNamespace = "assessment-template-draft";
 
-export function useLocalWdlTemplate(templateId: string | undefined) {
+export function useLocalAssessmentTemplate(templateId: string | undefined) {
   const [wrapped, setWrapped] = useState<{
-    document: WdlAssessmentTemplate;
+    document: AssessmentTemplate;
     meta: import("../types/local-meta").LocalDocumentMeta;
   } | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -27,7 +27,7 @@ export function useLocalWdlTemplate(templateId: string | undefined) {
     () =>
       debounce(
         (
-          doc: WdlAssessmentTemplate,
+          doc: AssessmentTemplate,
           meta: import("../types/local-meta").LocalDocumentMeta,
         ) => {
           if (!templateId) {
@@ -50,11 +50,11 @@ export function useLocalWdlTemplate(templateId: string | undefined) {
       return;
     }
     queueMicrotask(() => {
-      const existing = readWrapped<WdlAssessmentTemplate>(NS, templateId);
+      const existing = readWrapped<AssessmentTemplate>(NS, templateId);
       if (existing) {
         setWrapped(existing);
       } else {
-        const doc = emptyWdlTemplate(templateId);
+        const doc = emptyAssessmentTemplate(templateId);
         const meta = defaultMeta(doc.updatedAt);
         setWrapped({ document: doc, meta });
         writeWrapped(NS, templateId, { document: doc, meta });
@@ -67,7 +67,7 @@ export function useLocalWdlTemplate(templateId: string | undefined) {
   }, [templateId, saveDebounced]);
 
   const setDocument = useCallback(
-    (updater: (prev: WdlAssessmentTemplate) => WdlAssessmentTemplate) => {
+    (updater: (prev: AssessmentTemplate) => AssessmentTemplate) => {
       setWrapped((w) => {
         if (!w || !templateId) {
           return w;

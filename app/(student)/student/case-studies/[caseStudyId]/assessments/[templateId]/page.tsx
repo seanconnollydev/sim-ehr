@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { getPublishedWdlTemplate } from "@/lib/actions/wdl-template";
-import { WdlAssessmentRunner } from "@/components/student/wdl-assessment-runner";
+import { getPublishedAssessmentTemplate } from "@/lib/actions/assessment-template";
+import { AssessmentRunner } from "@/components/student/assessment-runner";
 import { Button } from "@/components/ui/button";
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
 
 export default async function StudentAssessmentPage({ params }: Props) {
   const { caseStudyId, templateId } = await params;
-  const template = await getPublishedWdlTemplate(templateId);
+  const template = await getPublishedAssessmentTemplate(templateId);
   if (!template) {
     return (
       <div className="space-y-4">
@@ -25,7 +25,7 @@ export default async function StudentAssessmentPage({ params }: Props) {
   }
 
   return (
-    <WdlAssessmentRunner
+    <AssessmentRunner
       caseStudyId={caseStudyId}
       templateId={templateId}
       template={template}

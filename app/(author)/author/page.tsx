@@ -33,7 +33,7 @@ export default function AuthorHubPage() {
           <CardTitle>Getting started</CardTitle>
           <CardDescription>
             Create a case study draft (saved in this browser), edit sections, then
-            publish to share. Link a WDL template from the assessments area.
+            publish to share. Link an assessment template from the assessments area.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-muted-foreground text-sm">

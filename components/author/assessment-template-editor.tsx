@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { publishWdlTemplate } from "@/lib/actions/wdl-template";
-import { useLocalWdlTemplate } from "@/lib/prototype-alpha/hooks/use-local-wdl-template";
+import { publishAssessmentTemplate } from "@/lib/actions/assessment-template";
+import { useLocalAssessmentTemplate } from "@/lib/prototype-alpha/hooks/use-local-assessment-template";
 import { newId } from "@/lib/prototype-alpha/ids";
-import type { WdlDomain, WdlItem } from "@/lib/prototype-alpha/types/wdl-template";
+import type { AssessmentDomain, AssessmentItem } from "@/lib/prototype-alpha/types/assessment-template";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,9 +33,9 @@ type Props = {
   initialCaseStudyId?: string;
 };
 
-export function WdlTemplateEditor({ templateId, initialCaseStudyId }: Props) {
+export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Props) {
   const { document, meta, setDocument, markSynced, setSyncError, hydrated } =
-    useLocalWdlTemplate(templateId);
+    useLocalAssessmentTemplate(templateId);
   const [newDomainLabel, setNewDomainLabel] = useState("");
 
   useEffect(() => {
@@ -57,7 +57,7 @@ export function WdlTemplateEditor({ templateId, initialCaseStudyId }: Props) {
       return;
     }
     setSyncError(null);
-    const res = await publishWdlTemplate({
+    const res = await publishAssessmentTemplate({
       document,
       clientUpdatedAt: clientUpdatedAtForPublish || document.updatedAt,
     });
@@ -89,13 +89,13 @@ export function WdlTemplateEditor({ templateId, initialCaseStudyId }: Props) {
     }));
   }
 
-  function addItem(responseType: WdlItem["responseType"]) {
+  function addItem(responseType: AssessmentItem["responseType"]) {
     if (!document) {
       return;
     }
     const domainId = document.domains[0]?.id ?? "dom_default";
     const id = `itm_${newId().slice(0, 8)}`;
-    const base: WdlItem = {
+    const base: AssessmentItem = {
       id,
       domainId,
       prompt: "New item",
@@ -123,7 +123,7 @@ export function WdlTemplateEditor({ templateId, initialCaseStudyId }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">WDL template</h1>
+          <h1 className="text-2xl font-semibold">Assessment template</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Domains group items. Each item has a response type and optional
             limits.
@@ -203,7 +203,7 @@ export function WdlTemplateEditor({ templateId, initialCaseStudyId }: Props) {
             </Button>
           </div>
           <ul className="space-y-2">
-            {document.domains.map((dom: WdlDomain) => (
+            {document.domains.map((dom: AssessmentDomain) => (
               <li
                 key={dom.id}
                 className="flex max-w-md items-center gap-2"
@@ -297,7 +297,7 @@ export function WdlTemplateEditor({ templateId, initialCaseStudyId }: Props) {
                   <Select
                     value={item.responseType}
                     onValueChange={(v) => {
-                      const rt = v as WdlItem["responseType"];
+                      const rt = v as AssessmentItem["responseType"];
                       setDocument((d) => ({
                         ...d,
                         items: d.items.map((it) =>

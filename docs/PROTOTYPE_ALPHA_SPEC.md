@@ -1,4 +1,4 @@
-# Prototype Alpha Specification (Authoring + WDL + Schema)
+# Prototype Alpha Specification (Authoring + Assessment + Schema)
 
 ## Purpose
 
@@ -18,12 +18,12 @@ This spec is written to be:
 - Full fidelity EHR workflows (orders, billing, interoperability, auditing) beyond what’s needed for the demo journeys below.
 - Full FHIR compliance. We will keep the schema **compatible with future alignment** (mapping-friendly) without adopting FHIR as a requirement now.
 - Highly granular role-based access control and enterprise auth flows (we can stub or simplify).
-- Perfect scoring/rubrics for WDL; the goal is to demonstrate a configurable WDL structure and persistence of student submissions.
+- Perfect scoring/rubrics for assessments; the goal is to demonstrate a configurable assessment structure and persistence of student submissions.
 
 ## Personas
 
 - **CaseStudyAuthor**: creates and iterates on simulation case studies; wants forms plus assisted generation to move faster.
-- **Student**: consumes a case study and completes a WDL assessment; expects autosave, resumability, and clear submission state.
+- **Student**: consumes a case study and completes an assessment; expects autosave, resumability, and clear submission state.
 
 ## Prototype Alpha user journeys
 
@@ -45,19 +45,19 @@ This spec is written to be:
 - The system generates a **structured patch** (field-level suggestions) that the author reviews and applies.
 - Generated content is tracked in **provenance metadata** (for transparency and iteration).
 
-### Author journey C: Configure a WDL assessment for a case
+### Author journey C: Configure an assessment for a case
 
 - Select a case study (draft or published).
-- Create a WDL assessment template:
+- Create an assessment template:
   - Define sections/domains
   - Define items/criteria (“Within defined limits” checks) and response types
   - Configure constraints (e.g., expected ranges for vitals, or allowed choices)
 - Save (local-first), optionally publish to Supabase.
 
-### Student journey D: Complete and submit a WDL assessment
+### Student journey D: Complete and submit an assessment
 
-- Open a case study and its associated WDL assessment template.
-- Fill out the WDL assessment (per item).
+- Open a case study and its associated assessment template.
+- Fill out the assessment (per item).
 - Autosave progress locally; resumable across reloads.
 - Submit final responses; persist submission to Supabase when available.
 
@@ -68,7 +68,7 @@ This section describes **where** author and student experiences live in the UI a
 ### Principles
 
 - **Persona-first areas**: separate **Author** and **Student** workspaces so navigation and mental models stay clear (see Security and data policy for simplest-possible separation).
-- **Deep-linkable artifacts**: case studies, **assessment templates** (WDL is one supported format), and in-progress submissions should be addressable by stable IDs in the URL where it improves recovery and sharing (fits local-first persistence and resumability).
+- **Deep-linkable artifacts**: case studies, **assessment templates**, and in-progress submissions should be addressable by stable IDs in the URL where it improves recovery and sharing (fits local-first persistence and resumability).
 - **Explicit sync surfaces**: “Publish” and “Submit” remain **deliberate actions** on screens tied to those artifacts—not only in global chrome.
 - **Synthetic-data visibility**: persistent or prominent **mock / synthetic data only** messaging at the app shell level (cross-reference Security and data policy).
 
@@ -88,7 +88,7 @@ Long **case study authoring** flows (journeys A and B) benefit from **section na
 
 Implementation should follow the **[Next.js App Router](https://nextjs.org/docs/app)** (`app/` directory): **route groups** (parentheses; no URL segment) may separate author vs student layouts, and **dynamic segments** identify artifacts (e.g. `[caseStudyId]`, `[templateId]`, `[submissionId]`).
 
-**Nomenclature**: Information architecture uses **assessments** as the capability (authoring templates, student attempts, submit). **WDL** (“Within Defined Limits”) remains an assessment *format* in schema and JSON types (`WdlAssessmentTemplate`, etc.); URLs and navigation should not imply WDL is the only kind of assessment.
+**Nomenclature**: Information architecture uses **assessments** for authoring templates, student attempts, and submit. Schema and JSON types use names such as `AssessmentTemplate` and `AssessmentSubmission`; URLs and navigation stay generic so additional assessment formats can be added later.
 
 **Recommended URL structure:**
 
@@ -120,7 +120,7 @@ flowchart TB
   - `/author`: Author hub (recent drafts, shortcuts to new case study or assessment templates).
   - `/author/case-studies`: List local and synced case studies (draft vs published reflected in UI as needed).
   - `/author/case-studies/[caseStudyId]`: **Case study editor**: guided forms (demographics, summary, timeline, attachments); **Generate** / **Improve** per section (journeys A and B); **Publish** action.
-  - `/author/assessments`: List assessment templates; creating new may require or suggest a `caseStudyId` (journey C). Templates may use WDL or other formats over time.
+  - `/author/assessments`: List assessment templates; creating new may require or suggest a `caseStudyId` (journey C). Templates may use different formats over time.
   - `/author/assessments/[templateId]`: Assessment template builder (domains, items, response types, constraints); **Publish** action.
 - **Student**
   - `/student`: Student hub (resume in-progress work, browse published case studies).
@@ -265,10 +265,10 @@ If draft documents outgrow **localStorage**, the same routes and views apply; on
     }
   ],
   "assessments": {
-    "wdlTemplates": [
+    "assessmentTemplates": [
       {
-        "templateId": "wdl_tpl_3b0d3b2f-2c3c-4a36-9b14-08f8b2a9d3a1",
-        "label": "WDL: Respiratory Assessment",
+        "templateId": "assessment_tpl_3b0d3b2f-2c3c-4a36-9b14-08f8b2a9d3a1",
+        "label": "Respiratory assessment",
         "x_defaultForStudents": true
       }
     ]
@@ -303,15 +303,15 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
 - `type` is a stable discriminator (`encounter`, `note`, `lab`, `medication`, `vitals`, `imaging`, `procedure`, `assessment`, `other`)
 - `data` is type-specific and can evolve without breaking the top-level structure
 
-### WdlAssessmentTemplate v0.1
+### AssessmentTemplate v0.1
 
 #### Summary
 
-`WdlAssessmentTemplate` defines the structure of a “Within Defined Limits” assessment. A template is authored/configured, then used to collect student submissions.
+`AssessmentTemplate` defines the structure of an assessment. A template is authored/configured, then used to collect student submissions.
 
 #### Minimal required fields
 
-- `schemaVersion`: `"wdlTemplate@0.1"`
+- `schemaVersion`: `"assessmentTemplate@0.1"`
 - `id`: string
 - `title`: string
 - `items`: array
@@ -320,9 +320,9 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
 
 ```json
 {
-  "schemaVersion": "wdlTemplate@0.1",
-  "id": "wdl_tpl_3b0d3b2f-2c3c-4a36-9b14-08f8b2a9d3a1",
-  "title": "WDL: Respiratory Assessment",
+  "schemaVersion": "assessmentTemplate@0.1",
+  "id": "assessment_tpl_3b0d3b2f-2c3c-4a36-9b14-08f8b2a9d3a1",
+  "title": "Respiratory assessment",
   "description": "Student checks key respiratory findings within defined limits.",
   "createdAt": "2026-03-30T00:00:00.000Z",
   "updatedAt": "2026-03-30T00:00:00.000Z",
@@ -371,7 +371,7 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
         { "id": "crackles", "label": "Crackles" },
         { "id": "diminished", "label": "Diminished" }
       ],
-      "definedLimits": { "type": "informational", "description": "Not all findings are WDL in COPD exacerbation." }
+      "definedLimits": { "type": "informational", "description": "Not all findings fall within the defined limits in COPD exacerbation." }
     },
     {
       "id": "itm_notes",
@@ -388,15 +388,15 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
 }
 ```
 
-### WdlAssessmentSubmission v0.1
+### AssessmentSubmission v0.1
 
 #### Summary
 
-`WdlAssessmentSubmission` captures a student’s responses to a specific WDL template in the context of a specific case study.
+`AssessmentSubmission` captures a student’s responses to a specific assessment template in the context of a specific case study.
 
 #### Minimal required fields
 
-- `schemaVersion`: `"wdlSubmission@0.1"`
+- `schemaVersion`: `"assessmentSubmission@0.1"`
 - `id`: string
 - `caseStudyId`: string
 - `templateId`: string
@@ -406,10 +406,10 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
 
 ```json
 {
-  "schemaVersion": "wdlSubmission@0.1",
-  "id": "wdl_sub_5f8b2a1c-1f2d-4fcb-9a43-2c0f0a0b12cd",
+  "schemaVersion": "assessmentSubmission@0.1",
+  "id": "assessment_sub_5f8b2a1c-1f2d-4fcb-9a43-2c0f0a0b12cd",
   "caseStudyId": "case_9f6b7c0d-1f9a-4f8d-9e66-5a2e2a6d1f6b",
-  "templateId": "wdl_tpl_3b0d3b2f-2c3c-4a36-9b14-08f8b2a9d3a1",
+  "templateId": "assessment_tpl_3b0d3b2f-2c3c-4a36-9b14-08f8b2a9d3a1",
   "student": {
     "actorType": "student",
     "actorId": "student_local_1",
@@ -435,7 +435,7 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
 
 - **Every experience autosaves locally**:
   - Case study authoring drafts
-  - WDL template drafts
+  - Assessment template drafts
   - Student assessment in-progress submissions
 - Local save should occur:
   - On any meaningful change (debounced)
@@ -452,8 +452,8 @@ To keep the schema flexible, timeline entries are intentionally “typed envelop
 
 - **Explicit sync events**:
   - “Publish case study”
-  - “Publish WDL template”
-  - “Submit WDL assessment”
+  - “Publish assessment template”
+  - “Submit assessment”
 - **Conflict behavior**:
   - Prototype Alpha chooses the simplest: server rejects if `updatedAt` is older than server’s `updatedAt` (optimistic concurrency).
   - Client offers “Reload server version” and preserves local draft copy to avoid data loss.
@@ -530,8 +530,8 @@ Example patch envelope:
 This section describes **what** we need to store, not the exact table design.
 
 - **Case studies**: store the full `CaseStudyDocument` JSON plus metadata (`id`, `title`, `updatedAt`, `status`, `tags`).
-- **WDL templates**: store the full `WdlAssessmentTemplate` JSON plus metadata.
-- **WDL submissions**: store the full `WdlAssessmentSubmission` JSON plus metadata, indexed by `caseStudyId` and `templateId` (and student identity if available).
+- **Assessment templates**: store the full `AssessmentTemplate` JSON plus metadata.
+- **Assessment submissions**: store the full `AssessmentSubmission` JSON plus metadata, indexed by `caseStudyId` and `templateId` (and student identity if available).
 
 ## Security and data policy
 
@@ -547,7 +547,7 @@ This section describes **what** we need to store, not the exact table design.
 - The document can represent:
   - Patient demographics
   - A timeline of clinical events
-  - Links to WDL templates
+  - Links to assessment templates
 - Unknown fields are preserved (round-trip safe).
 
 ### Authoring experience
@@ -562,10 +562,10 @@ This section describes **what** we need to store, not the exact table design.
 - Generated content is reviewable and applied as field-level patches.
 - Applied generations record provenance.
 
-### WDL assessment
+### Assessment
 
-- Author can create/configure a `WdlAssessmentTemplate` with multiple items and at least two response types.
-- Student can complete a WDL assessment; progress autosaves locally.
+- Author can create/configure an `AssessmentTemplate` with multiple items and at least two response types.
+- Student can complete an assessment; progress autosaves locally.
 - Student can submit; submission persists to Supabase (when network available).
 
 ## Open questions (intentionally deferred)

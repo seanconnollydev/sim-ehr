@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { listIds, readWrapped } from "@/lib/prototype-alpha/local-storage";
-import type { WdlAssessmentTemplate } from "@/lib/prototype-alpha/types/wdl-template";
+import type { AssessmentTemplate } from "@/lib/prototype-alpha/types/assessment-template";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -15,16 +15,16 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 
-export function AuthorWdlTemplateList() {
+export function AuthorAssessmentTemplateList() {
   const [rows, setRows] = useState<
     Array<{ id: string; title: string; status: string; dirty: boolean }>
   >([]);
 
   useEffect(() => {
     queueMicrotask(() => {
-      const ids = listIds("wdl-template-draft");
+      const ids = listIds("assessment-template-draft");
       const next = ids.map((id) => {
-        const w = readWrapped<WdlAssessmentTemplate>("wdl-template-draft", id);
+        const w = readWrapped<AssessmentTemplate>("assessment-template-draft", id);
         return {
           id,
           title: w?.document.title ?? id,
