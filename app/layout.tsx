@@ -6,7 +6,7 @@ import { ToasterProvider } from "@/components/toaster-provider";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
-const publicSans = Public_Sans({subsets:['latin'],variable:'--font-sans'});
+const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,10 +32,16 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", publicSans.variable)}
+      className={cn(
+        "h-full",
+        "antialiased",
+        geistSans.variable,
+        geistMono.variable,
+        "font-sans",
+        publicSans.variable,
+      )}
     >
       <body className="bg-background text-foreground flex min-h-full flex-col">
-        <MockDataBanner />
         <AppHeader />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
           {children}
