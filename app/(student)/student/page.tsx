@@ -22,6 +22,9 @@ export default function StudentHubPage() {
         <Button asChild>
           <Link href="/student/case-studies">Browse case studies</Link>
         </Button>
+        <Button asChild variant="outline">
+          <Link href="/student/assessments">Practice assessments</Link>
+        </Button>
       </div>
       <Card>
         <CardHeader>

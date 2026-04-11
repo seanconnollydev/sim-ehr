@@ -3,7 +3,12 @@
 import { z } from "zod";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
+  getBuiltinAssessmentTemplate,
+  isBuiltinTemplateId,
+} from "@/lib/assessments/builtin";
+import {
   ASSESSMENT_TEMPLATE_SCHEMA_VERSION,
+  normalizeAssessmentTemplate,
   type AssessmentTemplate,
 } from "@/lib/prototype-alpha/types/assessment-template";
 
@@ -23,7 +28,15 @@ export async function publishAssessmentTemplate(
   if (!parsed.success) {
     return { ok: false, code: "config", message: "Invalid payload" };
   }
-  const { document, clientUpdatedAt } = parsed.data;
+  const { clientUpdatedAt } = parsed.data;
+  const document = normalizeAssessmentTemplate(parsed.data.document);
+  if (isBuiltinTemplateId(document.id)) {
+    return {
+      ok: false,
+      code: "config",
+      message: "Built-in assessment templates cannot be published from the editor.",
+    };
+  }
   if (document.schemaVersion !== ASSESSMENT_TEMPLATE_SCHEMA_VERSION) {
     return { ok: false, code: "config", message: "Unsupported schema version" };
   }
@@ -100,7 +113,18 @@ export async function getPublishedAssessmentTemplate(
   if (error || !data) {
     return null;
   }
-  return data.document as AssessmentTemplate;
+  return normalizeAssessmentTemplate(data.document);
+}
+
+/** Published template from Supabase, or bundled built-in template (e.g. H2T). */
+export async function getAssessmentTemplateById(
+  id: string,
+): Promise<AssessmentTemplate | null> {
+  const fromDb = await getPublishedAssessmentTemplate(id);
+  if (fromDb) {
+    return fromDb;
+  }
+  return getBuiltinAssessmentTemplate(id);
 }
 
 export async function listPublishedAssessmentTemplates(): Promise<

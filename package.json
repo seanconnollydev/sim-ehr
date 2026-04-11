@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "build:h2t": "node scripts/build-h2t-assessment.mjs",
     "supabase:local:start": "supabase start",
     "supabase:local:stop": "supabase stop",
     "supabase:local:restart": "supabase stop && supabase start",
@@ -42,6 +43,7 @@
     "eslint-config-next": "16.2.1",
     "supabase": "^2.84.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "xlsx": "^0.18.5"
   }
 }

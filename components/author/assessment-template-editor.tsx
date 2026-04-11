@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { publishAssessmentTemplate } from "@/lib/actions/assessment-template";
 import { useLocalAssessmentTemplate } from "@/lib/prototype-alpha/hooks/use-local-assessment-template";
 import { newId } from "@/lib/prototype-alpha/ids";
-import type { AssessmentDomain, AssessmentItem } from "@/lib/prototype-alpha/types/assessment-template";
+import { isBuiltinTemplateId } from "@/lib/assessments/builtin";
+import type { AssessmentGroup, AssessmentItem } from "@/lib/prototype-alpha/types/assessment-template";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -36,7 +37,7 @@ type Props = {
 export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Props) {
   const { document, meta, setDocument, markSynced, setSyncError, hydrated } =
     useLocalAssessmentTemplate(templateId);
-  const [newDomainLabel, setNewDomainLabel] = useState("");
+  const [newGroupLabel, setNewGroupLabel] = useState("");
 
   useEffect(() => {
     if (!hydrated || !document || !initialCaseStudyId) {
@@ -75,17 +76,46 @@ export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Pro
     }
   }
 
-  if (!hydrated || !document) {
+  if (!hydrated) {
     return <p className="text-muted-foreground text-sm">Loading template…</p>;
   }
 
-  function addDomain() {
-    const label = newDomainLabel.trim() || "Domain";
-    const id = `dom_${newId().slice(0, 8)}`;
-    setNewDomainLabel("");
+  if (isBuiltinTemplateId(templateId)) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Built-in assessment</h1>
+        <p className="text-muted-foreground text-sm">
+          This template is bundled with the app and cannot be edited. Link it
+          from a case study or open preview to try the student experience.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="default">
+            <Link href={`/author/assessments/${templateId}/preview`}>
+              Open preview
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/author/assessments">Back to templates</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!document) {
+    return <p className="text-muted-foreground text-sm">Loading template…</p>;
+  }
+
+  function addGroup() {
+    const label = newGroupLabel.trim() || "Group";
+    const id = `grp_${newId().slice(0, 8)}`;
+    setNewGroupLabel("");
     setDocument((d) => ({
       ...d,
-      domains: [...d.domains, { id, label }],
+      groups: [
+        ...d.groups,
+        { id, label, parentGroupId: null },
+      ],
     }));
   }
 
@@ -93,11 +123,11 @@ export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Pro
     if (!document) {
       return;
     }
-    const domainId = document.domains[0]?.id ?? "dom_default";
+    const groupId = document.groups[0]?.id ?? "grp_default";
     const id = `itm_${newId().slice(0, 8)}`;
     const base: AssessmentItem = {
       id,
-      domainId,
+      groupId,
       prompt: "New item",
       responseType,
       definedLimits: { type: "none" },
@@ -125,7 +155,7 @@ export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Pro
         <div>
           <h1 className="text-2xl font-semibold">Assessment template</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Domains group items. Each item has a response type and optional
+            Groups organize items. Each item has a response type and optional
             limits.
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -187,40 +217,43 @@ export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Pro
 
       <Card>
         <CardHeader>
-          <CardTitle>Domains</CardTitle>
-          <CardDescription>Group items for display.</CardDescription>
+          <CardTitle>Groups</CardTitle>
+          <CardDescription>
+            Top-level section headings for display (nested groups may be added
+            later).
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <Input
-              placeholder="New domain label"
-              value={newDomainLabel}
-              onChange={(e) => setNewDomainLabel(e.target.value)}
+              placeholder="New group label"
+              value={newGroupLabel}
+              onChange={(e) => setNewGroupLabel(e.target.value)}
               className="max-w-xs"
             />
-            <Button type="button" variant="secondary" onClick={addDomain}>
-              Add domain
+            <Button type="button" variant="secondary" onClick={addGroup}>
+              Add group
             </Button>
           </div>
           <ul className="space-y-2">
-            {document.domains.map((dom: AssessmentDomain) => (
+            {document.groups.map((g: AssessmentGroup) => (
               <li
-                key={dom.id}
+                key={g.id}
                 className="flex max-w-md items-center gap-2"
               >
                 <Input
-                  value={dom.label}
+                  value={g.label}
                   onChange={(e) => {
                     const label = e.target.value;
                     setDocument((d) => ({
                       ...d,
-                      domains: d.domains.map((x) =>
-                        x.id === dom.id ? { ...x, label } : x,
+                      groups: d.groups.map((x) =>
+                        x.id === g.id ? { ...x, label } : x,
                       ),
                     }));
                   }}
                 />
-                <span className="text-muted-foreground text-xs">{dom.id}</span>
+                <span className="text-muted-foreground text-xs">{g.id}</span>
               </li>
             ))}
           </ul>
@@ -266,15 +299,15 @@ export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Pro
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Domain</Label>
+                  <Label>Group</Label>
                   <Select
-                    value={item.domainId ?? document.domains[0]?.id}
+                    value={item.groupId ?? document.groups[0]?.id}
                     onValueChange={(v) =>
                       setDocument((d) => ({
                         ...d,
                         items: d.items.map((it) =>
                           it.id === item.id
-                            ? { ...it, domainId: v || undefined }
+                            ? { ...it, groupId: v || undefined }
                             : it,
                         ),
                       }))
@@ -284,9 +317,9 @@ export function AssessmentTemplateEditor({ templateId, initialCaseStudyId }: Pro
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {document.domains.map((dom) => (
-                        <SelectItem key={dom.id} value={dom.id}>
-                          {dom.label}
+                      {document.groups.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

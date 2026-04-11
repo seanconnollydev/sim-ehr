@@ -79,6 +79,8 @@ export type CaseStudyTimelineEntry = {
 export type AssessmentTemplateRef = {
   templateId: string;
   label?: string;
+  /** `builtin` = bundled repo template; `author` = created in authoring UI (default). */
+  source?: "builtin" | "author";
   x_defaultForStudents?: boolean;
   [key: string]: unknown;
 };

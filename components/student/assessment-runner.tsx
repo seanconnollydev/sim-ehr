@@ -4,10 +4,15 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { toast } from "sonner";
 import { submitAssessment } from "@/lib/actions/assessment-submission";
+import { groupPathLabels } from "@/lib/assessments/group-path";
 import { useLocalAssessmentSubmission } from "@/lib/prototype-alpha/hooks/use-local-assessment-submission";
 import { nowIso } from "@/lib/prototype-alpha/ids";
-import type { AssessmentTemplate } from "@/lib/prototype-alpha/types/assessment-template";
+import {
+  normalizeAssessmentTemplate,
+  type AssessmentTemplate,
+} from "@/lib/prototype-alpha/types/assessment-template";
 import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
+import { AssessmentWorksheetLayout } from "@/components/student/assessment-worksheet-layout";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -26,13 +31,25 @@ type Props = {
   caseStudyId: string;
   templateId: string;
   template: AssessmentTemplate;
+  /** Shown above the title (e.g. author preview). */
+  previewBanner?: string;
+  backHref?: string;
+  backLabel?: string;
 };
 
 export function AssessmentRunner({
   caseStudyId,
   templateId,
-  template,
+  template: templateRaw,
+  previewBanner,
+  backHref = `/student/case-studies/${caseStudyId}`,
+  backLabel = "Back to case",
 }: Props) {
+  const template = useMemo(
+    () => normalizeAssessmentTemplate(templateRaw),
+    [templateRaw],
+  );
+
   const { document, meta, setDocument, markSynced, setSyncError, hydrated } =
     useLocalAssessmentSubmission(caseStudyId, templateId);
 
@@ -40,6 +57,8 @@ export function AssessmentRunner({
     () => meta?.syncedBasisAt ?? document?.updatedAt ?? "",
     [meta?.syncedBasisAt, document?.updatedAt],
   );
+
+  const layout = template.x_presentation?.layout ?? "cards";
 
   async function handleSubmit() {
     if (!document) {
@@ -84,12 +103,15 @@ export function AssessmentRunner({
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
 
-  const domainsById = Object.fromEntries(
-    template.domains.map((d) => [d.id, d.label]),
-  );
+  const groups = template.groups ?? [];
 
   return (
     <div className="space-y-6">
+      {previewBanner && (
+        <p className="bg-muted text-muted-foreground rounded-md border px-3 py-2 text-sm">
+          {previewBanner}
+        </p>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{template.title}</h1>
@@ -115,99 +137,129 @@ export function AssessmentRunner({
         )}
       </div>
 
-      <div className="space-y-6">
-        {template.items.map((item) => (
-          <Card key={item.id}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">{item.prompt}</CardTitle>
-              {item.domainId && (
-                <CardDescription>
-                  {domainsById[item.domainId] ?? item.domainId}
-                </CardDescription>
-              )}
-            </CardHeader>
-            <CardContent>
-              {item.responseType === "boolean" && (
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id={`${item.id}-bool`}
-                    checked={Boolean(document.responses[item.id]?.value === true)}
-                    onCheckedChange={(c) =>
-                      setResponse(item.id, c === true)
-                    }
-                  />
-                  <Label htmlFor={`${item.id}-bool`}>Yes / within limits</Label>
-                </div>
-              )}
-              {(item.responseType === "choice" ||
-                item.responseType === "multiChoice") && (
-                <div className="space-y-3">
-                  {item.responseType === "choice" ? (
-                    <RadioGroup
-                      value={String(document.responses[item.id]?.value ?? "")}
-                      onValueChange={(v) => setResponse(item.id, v)}
-                    >
-                      {(item.choices ?? []).map((ch) => (
-                        <div key={ch.id} className="flex items-center gap-2">
-                          <RadioGroupItem value={ch.id} id={`${item.id}-${ch.id}`} />
-                          <Label htmlFor={`${item.id}-${ch.id}`} className="font-normal">
-                            {ch.label}
-                          </Label>
-                        </div>
-                      ))}
-                    </RadioGroup>
-                  ) : (
-                    <div className="space-y-2">
-                      {(item.choices ?? []).map((ch) => {
-                        const selected = Array.isArray(
-                          document.responses[item.id]?.value,
-                        )
-                          ? (document.responses[item.id]?.value as string[])
-                          : [];
-                        const checked = selected.includes(ch.id);
-                        return (
-                          <div key={ch.id} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`${item.id}-${ch.id}`}
-                              checked={checked}
-                              onCheckedChange={(c) => {
-                                const next = new Set(selected);
-                                if (c === true) {
-                                  next.add(ch.id);
-                                } else {
-                                  next.delete(ch.id);
-                                }
-                                setResponse(item.id, [...next]);
-                              }}
-                            />
-                            <Label
-                              htmlFor={`${item.id}-${ch.id}`}
-                              className="font-normal"
-                            >
-                              {ch.label}
-                            </Label>
-                          </div>
-                        );
-                      })}
+      {layout === "worksheet" ? (
+        <AssessmentWorksheetLayout
+          template={template}
+          responses={document.responses}
+          setResponse={setResponse}
+        />
+      ) : (
+        <div className="space-y-6">
+          {template.items.map((item) => {
+            const path = groupPathLabels(groups, item.groupId ?? item.domainId);
+            const groupLine = path.length > 0 ? path.join(" → ") : null;
+            return (
+              <Card key={item.id}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">{item.prompt}</CardTitle>
+                  {groupLine && (
+                    <CardDescription>{groupLine}</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  {item.responseType === "boolean" && (
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id={`${item.id}-bool`}
+                        checked={Boolean(
+                          document.responses[item.id]?.value === true,
+                        )}
+                        onCheckedChange={(c) =>
+                          setResponse(item.id, c === true)
+                        }
+                      />
+                      <Label htmlFor={`${item.id}-bool`}>
+                        Yes / within limits
+                      </Label>
                     </div>
                   )}
-                </div>
-              )}
-              {item.responseType === "text" && (
-                <Textarea
-                  rows={4}
-                  value={String(document.responses[item.id]?.value ?? "")}
-                  onChange={(e) => setResponse(item.id, e.target.value)}
-                />
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                  {(item.responseType === "choice" ||
+                    item.responseType === "multiChoice") && (
+                    <div className="space-y-3">
+                      {item.responseType === "choice" ? (
+                        <RadioGroup
+                          value={String(
+                            document.responses[item.id]?.value ?? "",
+                          )}
+                          onValueChange={(v) => setResponse(item.id, v)}
+                        >
+                          {(item.choices ?? []).map((ch) => (
+                            <div key={ch.id} className="flex items-center gap-2">
+                              <RadioGroupItem
+                                value={ch.id}
+                                id={`${item.id}-${ch.id}`}
+                              />
+                              <Label
+                                htmlFor={`${item.id}-${ch.id}`}
+                                className="font-normal"
+                              >
+                                {ch.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </RadioGroup>
+                      ) : (
+                        <div className="space-y-2">
+                          {(item.choices ?? []).map((ch) => {
+                            const selected = Array.isArray(
+                              document.responses[item.id]?.value,
+                            )
+                              ? (document.responses[item.id]?.value as string[])
+                              : [];
+                            const checked = selected.includes(ch.id);
+                            return (
+                              <div key={ch.id} className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`${item.id}-${ch.id}`}
+                                  checked={checked}
+                                  onCheckedChange={(c) => {
+                                    const next = new Set(selected);
+                                    if (c === true) {
+                                      next.add(ch.id);
+                                    } else {
+                                      next.delete(ch.id);
+                                    }
+                                    setResponse(item.id, [...next]);
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`${item.id}-${ch.id}`}
+                                  className="font-normal"
+                                >
+                                  {ch.label}
+                                </Label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {item.responseType === "text" && (
+                    <Textarea
+                      rows={4}
+                      value={String(document.responses[item.id]?.value ?? "")}
+                      onChange={(e) =>
+                        setResponse(item.id, e.target.value)
+                      }
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {template.x_licenseNotice && (
+        <p className="text-muted-foreground border-t pt-4 text-xs leading-relaxed">
+          {template.x_licenseNotice}
+        </p>
+      )}
 
       <p className="text-muted-foreground text-sm">
-        <Link href={`/student/case-studies/${caseStudyId}`} className="underline">
-          Back to case
+        <Link href={backHref} className="underline">
+          {backLabel}
         </Link>
       </p>
     </div>

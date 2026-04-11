@@ -7,6 +7,7 @@ import { publishCaseStudy } from "@/lib/actions/case-study";
 import { deepMerge } from "@/lib/prototype-alpha/merge";
 import { useLocalCaseStudy } from "@/lib/prototype-alpha/hooks/use-local-case-study";
 import { newId } from "@/lib/prototype-alpha/ids";
+import { BUILTIN_ASSESSMENT_CATALOG } from "@/lib/assessments/constants";
 import {
   type CaseStudyDocument,
   type CaseStudyTimelineEntry,
@@ -463,41 +464,85 @@ export function CaseStudyEditor({ caseStudyId }: Props) {
 
         <TabsContent value="assessments" className="space-y-4">
           <p className="text-muted-foreground text-sm">
-            Linked assessment templates (for student navigation). Manage templates in{" "}
+            Link a <strong>built-in</strong> assessment (bundled in this app) or
+            an <strong>author-created</strong> template. Manage author templates
+            in{" "}
             <Link href="/author/assessments" className="underline">
               Assessments
             </Link>
             .
           </p>
           <Separator />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              const templateId = `assessment_tpl_${newId()}`;
-              setDocument((d) => ({
-                ...d,
-                assessments: {
-                  ...d.assessments,
-                  assessmentTemplates: [
-                    ...linkedAssessmentTemplates(d.assessments),
-                    {
-                      templateId,
-                      label: "New assessment template",
-                      x_defaultForStudents: false,
-                    },
-                  ],
-                },
-              }));
-            }}
-          >
-            Add template reference
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const catalog = BUILTIN_ASSESSMENT_CATALOG[0];
+                if (!catalog) {
+                  return;
+                }
+                const existing = linkedAssessmentTemplates(document.assessments);
+                if (existing.some((e) => e.templateId === catalog.templateId)) {
+                  toast.message("That built-in assessment is already linked.");
+                  return;
+                }
+                setDocument((d) => ({
+                  ...d,
+                  assessments: {
+                    ...d.assessments,
+                    assessmentTemplates: [
+                      ...existing,
+                      {
+                        templateId: catalog.templateId,
+                        label: catalog.title,
+                        source: "builtin" as const,
+                        x_defaultForStudents: false,
+                      },
+                    ],
+                  },
+                }));
+              }}
+            >
+              Add built-in (H2T)
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const templateId = `assessment_tpl_${newId()}`;
+                setDocument((d) => ({
+                  ...d,
+                  assessments: {
+                    ...d.assessments,
+                    assessmentTemplates: [
+                      ...linkedAssessmentTemplates(d.assessments),
+                      {
+                        templateId,
+                        label: "New assessment template",
+                        source: "author" as const,
+                        x_defaultForStudents: false,
+                      },
+                    ],
+                  },
+                }));
+              }}
+            >
+              New author template link
+            </Button>
+          </div>
           <ul className="list-inside list-disc space-y-1 text-sm">
             {linkedAssessmentTemplates(document.assessments).map((w) => (
               <li key={w.templateId}>
+                <Badge variant="outline" className="mr-2 align-middle">
+                  {w.source === "builtin" ? "Built-in" : "Author"}
+                </Badge>
                 <Link
-                  href={`/author/assessments/${w.templateId}`}
+                  href={
+                    w.source === "builtin"
+                      ? `/author/assessments/${w.templateId}/preview`
+                      : `/author/assessments/${w.templateId}`
+                  }
                   className="underline"
                 >
                   {w.label ?? w.templateId}

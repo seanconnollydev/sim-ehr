@@ -8,8 +8,10 @@ import {
   writeWrapped,
   type StorageNamespace,
 } from "../local-storage";
+import { isBuiltinTemplateId } from "@/lib/assessments/builtin";
 import {
   emptyAssessmentTemplate,
+  normalizeAssessmentTemplate,
   type AssessmentTemplate,
 } from "../types/assessment-template";
 import { nowIso } from "../ids";
@@ -49,10 +51,20 @@ export function useLocalAssessmentTemplate(templateId: string | undefined) {
       });
       return;
     }
+    if (isBuiltinTemplateId(templateId)) {
+      queueMicrotask(() => {
+        setWrapped(null);
+        setHydrated(true);
+      });
+      return;
+    }
     queueMicrotask(() => {
       const existing = readWrapped<AssessmentTemplate>(NS, templateId);
       if (existing) {
-        setWrapped(existing);
+        setWrapped({
+          document: normalizeAssessmentTemplate(existing.document),
+          meta: existing.meta,
+        });
       } else {
         const doc = emptyAssessmentTemplate(templateId);
         const meta = defaultMeta(doc.updatedAt);
