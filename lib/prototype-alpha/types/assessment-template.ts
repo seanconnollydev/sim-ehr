@@ -40,7 +40,7 @@ export type AssessmentDomain = {
   [key: string]: unknown;
 };
 
-export type AssessmentPresentationLayout = "cards" | "worksheet";
+export type AssessmentPresentationLayout = "cards" | "worksheet" | "flowsheet";
 
 export type AssessmentItem = {
   id: string;

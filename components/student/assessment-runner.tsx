@@ -12,6 +12,7 @@ import {
   type AssessmentTemplate,
 } from "@/lib/prototype-alpha/types/assessment-template";
 import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
+import { AssessmentFlowsheetLayout } from "@/components/student/assessment-flowsheet-layout";
 import { AssessmentWorksheetLayout } from "@/components/student/assessment-worksheet-layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -137,7 +138,13 @@ export function AssessmentRunner({
         )}
       </div>
 
-      {layout === "worksheet" ? (
+      {layout === "flowsheet" ? (
+        <AssessmentFlowsheetLayout
+          template={template}
+          responses={document.responses}
+          setResponse={setResponse}
+        />
+      ) : layout === "worksheet" ? (
         <AssessmentWorksheetLayout
           template={template}
           responses={document.responses}

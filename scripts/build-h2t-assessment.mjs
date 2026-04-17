@@ -155,7 +155,7 @@ const doc = {
   status: "published",
   groups,
   items,
-  x_presentation: { layout: "worksheet" },
+  x_presentation: { layout: "flowsheet" },
   x_licenseNotice: LICENSE_NOTICE,
   provenance: {
     authoredBy: { actorType: "repository", actorId: "h2t_workbook" },
