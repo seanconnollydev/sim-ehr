@@ -8,7 +8,7 @@ import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessm
 /** Synthetic choice id appended to WDL gate rows for Epic-style “X” (exception) documentation. */
 export const FLOWSHEET_EXCEPTION_CHOICE_ID = "ch_flowsheet_exception";
 
-export const FLOWSHEET_EXCEPTION_CHOICE_LABEL = "X — Exception (document below)";
+export const FLOWSHEET_EXCEPTION_CHOICE_LABEL = "X";
 
 export function isFlowsheetWdlGateItem(item: AssessmentItem): boolean {
   if (item.responseType !== "choice") {

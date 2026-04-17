@@ -59,7 +59,9 @@ export function AssessmentChoiceCombobox({
           className,
         )}
       >
-        <SelectValue placeholder="Select…" />
+        <SelectValue placeholder="Select…">
+          {hasValue ? selected?.label : undefined}
+        </SelectValue>
       </SelectTrigger>
       <SelectContent
         align="start"

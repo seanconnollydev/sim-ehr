@@ -5,6 +5,7 @@ import type { AssessmentTemplate } from "@/lib/prototype-alpha/types/assessment-
 import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
 import { groupPathLabels } from "@/lib/assessments/group-path";
 import {
+  FLOWSHEET_EXCEPTION_CHOICE_ID,
   findGateItemForGroup,
   flowsheetDetailItemsForGroup,
   flowsheetOrderedItemsForGroup,
@@ -270,7 +271,17 @@ export function AssessmentFlowsheetLayout({
                             <AssessmentChoiceCombobox
                               id={selId}
                               label={item.prompt}
-                              choices={item.choices ?? []}
+                              choices={
+                                isGate
+                                  ? (item.choices ?? []).map((ch) => ({
+                                      ...ch,
+                                      label:
+                                        ch.id === FLOWSHEET_EXCEPTION_CHOICE_ID
+                                          ? "X"
+                                          : "WDL",
+                                    }))
+                                  : (item.choices ?? [])
+                              }
                               value={String(responses[item.id]?.value ?? "")}
                               onChange={(v) => setResponse(item.id, v)}
                               className="w-full min-w-0"
