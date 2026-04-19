@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isLocalOnlyAssessmentCaseStudy } from "@/lib/assessments/constants";
 import {
   debounce,
   defaultMeta,
@@ -69,7 +70,29 @@ export function useLocalAssessmentSubmission(
         templateId,
       );
       if (existing) {
-        setWrapped(existing);
+        let doc = existing.document;
+        let meta = existing.meta;
+        if (
+          isLocalOnlyAssessmentCaseStudy(caseStudyId) &&
+          doc.status === "submitted"
+        ) {
+          const updatedAt = nowIso();
+          doc = {
+            ...doc,
+            status: "in_progress",
+            submittedAt: null,
+            updatedAt,
+          };
+          meta = {
+            ...meta,
+            updatedAt,
+            dirty: true,
+            syncedBasisAt: null,
+            syncError: null,
+          };
+          writeSubmission(caseStudyId, templateId, { document: doc, meta });
+        }
+        setWrapped({ document: doc, meta });
       } else {
         const actorId = getStudentActorId();
         const doc = emptyAssessmentSubmission(

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { submitAssessment } from "@/lib/actions/assessment-submission";
+import { isLocalOnlyAssessmentCaseStudy } from "@/lib/assessments/constants";
 import { groupPathLabels } from "@/lib/assessments/group-path";
 import { useLocalAssessmentSubmission } from "@/lib/prototype-alpha/hooks/use-local-assessment-submission";
 import { nowIso } from "@/lib/prototype-alpha/ids";
@@ -27,6 +28,37 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+function hasMeaningfulResponses(
+  responses: Record<string, AssessmentItemResponse>,
+): boolean {
+  for (const r of Object.values(responses)) {
+    const v = r?.value;
+    if (v === true || v === false) {
+      return true;
+    }
+    if (typeof v === "number" && !Number.isNaN(v)) {
+      return true;
+    }
+    if (typeof v === "string" && v.trim() !== "") {
+      return true;
+    }
+    if (Array.isArray(v) && v.length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 type Props = {
   caseStudyId: string;
@@ -54,6 +86,9 @@ export function AssessmentRunner({
   const { document, meta, setDocument, markSynced, setSyncError, hydrated } =
     useLocalAssessmentSubmission(caseStudyId, templateId);
 
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [flowsheetRemountKey, setFlowsheetRemountKey] = useState(0);
+
   const clientUpdatedAtForSubmit = useMemo(
     () => meta?.syncedBasisAt ?? document?.updatedAt ?? "",
     [meta?.syncedBasisAt, document?.updatedAt],
@@ -61,8 +96,20 @@ export function AssessmentRunner({
 
   const layout = template.x_presentation?.layout ?? "cards";
 
+  const localOnlyAssessment = useMemo(
+    () => isLocalOnlyAssessmentCaseStudy(caseStudyId),
+    [caseStudyId],
+  );
+
   async function handleSubmit() {
     if (!document) {
+      return;
+    }
+    if (localOnlyAssessment) {
+      setSyncError(null);
+      toast.success(
+        "Saved on this device. You can keep editing, reset, or leave anytime.",
+      );
       return;
     }
     if (document.status === "submitted") {
@@ -100,6 +147,14 @@ export function AssessmentRunner({
     }));
   }
 
+  function handleResetConfirm() {
+    setSyncError(null);
+    setDocument((d) => ({ ...d, responses: {} }));
+    setFlowsheetRemountKey((k) => k + 1);
+    toast.success("Assessment reset.");
+    setResetDialogOpen(false);
+  }
+
   if (!hydrated || !document) {
     return <p className="text-muted-foreground text-sm">Loading…</p>;
   }
@@ -132,14 +187,48 @@ export function AssessmentRunner({
           )}
         </div>
         {document.status !== "submitted" ? (
-          <Button onClick={handleSubmit}>Submit</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!hasMeaningfulResponses(document.responses)}
+              onClick={() => setResetDialogOpen(true)}
+            >
+              Reset
+            </Button>
+            <Button type="button" onClick={handleSubmit}>
+              {localOnlyAssessment ? "Done" : "Submit"}
+            </Button>
+          </div>
         ) : (
           <Badge>Submitted</Badge>
         )}
       </div>
 
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start over?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clears all answers for this assessment. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel type="button">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              type="button"
+              variant="destructive"
+              onClick={handleResetConfirm}
+            >
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {layout === "flowsheet" ? (
         <AssessmentFlowsheetLayout
+          key={flowsheetRemountKey}
           template={template}
           responses={document.responses}
           setResponse={setResponse}
