@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { AssessmentTemplate } from "@/lib/prototype-alpha/types/assessment-template";
 import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
 import { groupPathLabels } from "@/lib/assessments/group-path";
@@ -9,10 +9,14 @@ import {
   findGateItemForGroup,
   flowsheetDetailItemsForGroup,
   flowsheetOrderedItemsForGroup,
+  getWdlDefinitionForItem,
   isFlowsheetExceptionSelected,
+  isFlowsheetWdlGateItem,
   prepareFlowsheetTemplate,
+  segmentWdlDefinitionText,
 } from "@/lib/assessments/flowsheet";
 import { AssessmentChoiceCombobox } from "@/components/student/assessment-choice-combobox";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Collapsible,
@@ -33,13 +37,51 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { ArrowRight01Icon } from "@hugeicons/core-free-icons";
+import {
+  ArrowRight01Icon,
+  Cancel01Icon,
+  SearchIcon,
+} from "@hugeicons/core-free-icons";
 
 type Props = {
   template: AssessmentTemplate;
   responses: Record<string, AssessmentItemResponse>;
   setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
 };
+
+function FlowsheetValueWithWdl({
+  showWdl,
+  ariaLabel,
+  onOpenWdl,
+  children,
+}: {
+  showWdl: boolean;
+  ariaLabel: string;
+  onOpenWdl: () => void;
+  children: ReactNode;
+}) {
+  if (!showWdl) {
+    return <>{children}</>;
+  }
+  return (
+    <div className="flex min-w-0 items-start gap-1">
+      <div className="min-w-0 flex-1">{children}</div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="text-muted-foreground hover:text-foreground size-7 shrink-0"
+        aria-label={ariaLabel}
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenWdl();
+        }}
+      >
+        <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="size-4" />
+      </Button>
+    </div>
+  );
+}
 
 function firstLeafGroupIdForRoot(
   groups: AssessmentTemplate["groups"],
@@ -67,6 +109,16 @@ export function AssessmentFlowsheetLayout({
   const groups = useMemo(() => template.groups ?? [], [template.groups]);
   const items = template.items;
   const [railQuery, setRailQuery] = useState("");
+  const [wdlPanelItemId, setWdlPanelItemId] = useState<string | null>(null);
+
+  const wdlPanelItem = wdlPanelItemId
+    ? items.find((i) => i.id === wdlPanelItemId)
+    : undefined;
+  const wdlPanelDefinition =
+    wdlPanelItem && getWdlDefinitionForItem(wdlPanelItem);
+  const wdlPanelPathLine = wdlPanelItem
+    ? groupPathLabels(groups, wdlPanelItem.groupId).join(" → ")
+    : "";
 
   const rootGroups = useMemo(
     () => groups.filter((g) => g.parentGroupId === null),
@@ -188,7 +240,8 @@ export function AssessmentFlowsheetLayout({
         </ScrollArea>
       </aside>
 
-      <div className="bg-background min-w-0 flex-1 overflow-auto">
+      <div className="flex min-h-0 min-w-0 flex-1">
+        <div className="bg-background min-w-0 flex-1 overflow-auto">
         <Table className="table-fixed">
           <TableHeader className="bg-background sticky top-0 z-20 shadow-[0_1px_0_0_hsl(var(--border))]">
             <TableRow className="hover:bg-transparent">
@@ -245,6 +298,8 @@ export function AssessmentFlowsheetLayout({
                     }
 
                     const selId = `flowsheet-${item.id}`;
+                    const wdlDef = getWdlDefinitionForItem(item);
+                    const showWdlInfo = Boolean(wdlDef);
                     return (
                       <TableRow
                         key={item.id}
@@ -267,84 +322,91 @@ export function AssessmentFlowsheetLayout({
                           </Label>
                         </TableCell>
                         <TableCell className="align-top py-1 pr-3 pl-2">
-                          {item.responseType === "choice" && (
-                            <AssessmentChoiceCombobox
-                              id={selId}
-                              label={item.prompt}
-                              choices={
-                                isGate
-                                  ? (item.choices ?? []).map((ch) => ({
-                                      ...ch,
-                                      label:
-                                        ch.id === FLOWSHEET_EXCEPTION_CHOICE_ID
-                                          ? "X"
-                                          : "WDL",
-                                    }))
-                                  : (item.choices ?? [])
-                              }
-                              value={String(responses[item.id]?.value ?? "")}
-                              onChange={(v) => setResponse(item.id, v)}
-                              className="w-full min-w-0"
-                            />
-                          )}
-                          {item.responseType === "multiChoice" && (
-                            <div className="flex max-w-full flex-col gap-1.5">
-                              {(item.choices ?? []).map((ch) => {
-                                const selected = Array.isArray(
-                                  responses[item.id]?.value,
-                                )
-                                  ? (responses[item.id]?.value as string[])
-                                  : [];
-                                const checked = selected.includes(ch.id);
-                                return (
-                                  <label
-                                    key={ch.id}
-                                    className="flex items-start gap-2 text-xs leading-snug"
-                                  >
-                                    <Checkbox
-                                      checked={checked}
-                                      onCheckedChange={(c) => {
-                                        const next = new Set(selected);
-                                        if (c === true) {
-                                          next.add(ch.id);
-                                        } else {
-                                          next.delete(ch.id);
-                                        }
-                                        setResponse(item.id, [...next]);
-                                      }}
-                                    />
-                                    <span>{ch.label}</span>
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          )}
-                          {item.responseType === "boolean" && (
-                            <label className="flex items-center gap-2 text-xs">
-                              <Checkbox
+                          <FlowsheetValueWithWdl
+                            showWdl={showWdlInfo}
+                            ariaLabel={`View Within Defined Limits definition for ${item.prompt}`}
+                            onOpenWdl={() => setWdlPanelItemId(item.id)}
+                          >
+                            {item.responseType === "choice" && (
+                              <AssessmentChoiceCombobox
                                 id={selId}
-                                checked={Boolean(
-                                  responses[item.id]?.value === true,
-                                )}
-                                onCheckedChange={(c) =>
-                                  setResponse(item.id, c === true)
+                                label={item.prompt}
+                                choices={
+                                  isGate
+                                    ? (item.choices ?? []).map((ch) => ({
+                                        ...ch,
+                                        label:
+                                          ch.id ===
+                                          FLOWSHEET_EXCEPTION_CHOICE_ID
+                                            ? "X"
+                                            : "WDL",
+                                      }))
+                                    : (item.choices ?? [])
                                 }
+                                value={String(responses[item.id]?.value ?? "")}
+                                onChange={(v) => setResponse(item.id, v)}
+                                className="w-full min-w-0"
                               />
-                              Yes / within limits
-                            </label>
-                          )}
-                          {item.responseType === "text" && (
-                            <Textarea
-                              id={selId}
-                              rows={2}
-                              className="min-h-[52px] resize-y px-2 py-1 text-xs"
-                              value={String(responses[item.id]?.value ?? "")}
-                              onChange={(e) =>
-                                setResponse(item.id, e.target.value)
-                              }
-                              aria-label={item.prompt}
-                            />
-                          )}
+                            )}
+                            {item.responseType === "multiChoice" && (
+                              <div className="flex max-w-full flex-col gap-1.5">
+                                {(item.choices ?? []).map((ch) => {
+                                  const selected = Array.isArray(
+                                    responses[item.id]?.value,
+                                  )
+                                    ? (responses[item.id]?.value as string[])
+                                    : [];
+                                  const checked = selected.includes(ch.id);
+                                  return (
+                                    <label
+                                      key={ch.id}
+                                      className="flex items-start gap-2 text-xs leading-snug"
+                                    >
+                                      <Checkbox
+                                        checked={checked}
+                                        onCheckedChange={(c) => {
+                                          const next = new Set(selected);
+                                          if (c === true) {
+                                            next.add(ch.id);
+                                          } else {
+                                            next.delete(ch.id);
+                                          }
+                                          setResponse(item.id, [...next]);
+                                        }}
+                                      />
+                                      <span>{ch.label}</span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {item.responseType === "boolean" && (
+                              <label className="flex items-center gap-2 text-xs">
+                                <Checkbox
+                                  id={selId}
+                                  checked={Boolean(
+                                    responses[item.id]?.value === true,
+                                  )}
+                                  onCheckedChange={(c) =>
+                                    setResponse(item.id, c === true)
+                                  }
+                                />
+                                Yes / within limits
+                              </label>
+                            )}
+                            {item.responseType === "text" && (
+                              <Textarea
+                                id={selId}
+                                rows={2}
+                                className="min-h-[52px] resize-y px-2 py-1 text-xs"
+                                value={String(responses[item.id]?.value ?? "")}
+                                onChange={(e) =>
+                                  setResponse(item.id, e.target.value)
+                                }
+                                aria-label={item.prompt}
+                              />
+                            )}
+                          </FlowsheetValueWithWdl>
                         </TableCell>
                       </TableRow>
                     );
@@ -353,6 +415,63 @@ export function AssessmentFlowsheetLayout({
               );
             })}
         </Table>
+        </div>
+
+        <aside
+          className={cn(
+            "border-border bg-muted/10 flex min-h-0 flex-col border-l transition-[width] duration-200 ease-out",
+            wdlPanelItemId
+              ? "w-[min(22rem,40vw)] shrink-0"
+              : "w-0 shrink-0 overflow-hidden border-l-0",
+          )}
+          aria-hidden={!wdlPanelItemId}
+        >
+          {wdlPanelItem && wdlPanelDefinition ? (
+            <div className="flex min-h-0 min-w-[min(22rem,40vw)] flex-1 flex-col">
+              <div className="border-b px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-muted-foreground line-clamp-2 text-[10px] leading-tight">
+                      {wdlPanelPathLine || "—"}
+                    </p>
+                    <p className="text-foreground mt-0.5 text-xs font-semibold leading-snug">
+                      {wdlPanelItem.prompt}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className="shrink-0"
+                    aria-label="Close definition panel"
+                    onClick={() => setWdlPanelItemId(null)}
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+                  </Button>
+                </div>
+                {isFlowsheetWdlGateItem(wdlPanelItem) ? (
+                  <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
+                    WDL = Within defined limits. X = Exceptions to WDL.
+                  </p>
+                ) : null}
+              </div>
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="p-3">
+                  <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
+                    Row information
+                  </p>
+                  <ul className="text-foreground list-disc space-y-1.5 pl-4 text-xs leading-relaxed">
+                    {segmentWdlDefinitionText(wdlPanelDefinition).map(
+                      (segment, i) => (
+                        <li key={i}>{segment}</li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              </ScrollArea>
+            </div>
+          ) : null}
+        </aside>
       </div>
     </div>
   );

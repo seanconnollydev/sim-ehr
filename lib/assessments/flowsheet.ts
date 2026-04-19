@@ -91,3 +91,52 @@ export function flowsheetOrderedItemsForGroup(
   const rest = inGroup.filter((it) => it.id !== gate.id);
   return [gate, ...rest];
 }
+
+const WDL_EQUALS_PREFIX = /^\s*WDL\s*=\s*/i;
+
+/**
+ * Narrative shown in the WDL info panel: gate rows use non-exception choice label(s);
+ * other choice rows use text after `WDL =` on a matching choice.
+ */
+export function getWdlDefinitionForItem(item: AssessmentItem): string | null {
+  if (isFlowsheetWdlGateItem(item)) {
+    const parts = (item.choices ?? [])
+      .filter((c) => c.id !== FLOWSHEET_EXCEPTION_CHOICE_ID)
+      .map((c) => c.label.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
+      return null;
+    }
+    return parts.join("\n\n");
+  }
+  if (item.responseType === "choice" || item.responseType === "multiChoice") {
+    for (const c of item.choices ?? []) {
+      const label = c.label;
+      const match = label.match(WDL_EQUALS_PREFIX);
+      if (match && match.index !== undefined) {
+        return label.slice(match.index + match[0].length).trim();
+      }
+    }
+  }
+  return null;
+}
+
+/** Split definition copy into bullet segments (paragraph breaks, then semicolons). */
+export function segmentWdlDefinitionText(text: string): string[] {
+  const t = text.trim();
+  const paragraphs = t.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  const chunks = paragraphs.length > 1 ? paragraphs : [t];
+  const out: string[] = [];
+  for (const chunk of chunks) {
+    const bySemi = chunk
+      .split(";")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (bySemi.length > 1) {
+      out.push(...bySemi);
+    } else {
+      out.push(chunk);
+    }
+  }
+  return out.length > 0 ? out : [t];
+}
