@@ -50,6 +50,8 @@ type Props = {
   template: AssessmentTemplate;
   responses: Record<string, AssessmentItemResponse>;
   setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
+  /** Merged onto the root layout wrapper (e.g. height constraints from the parent page). */
+  className?: string;
 };
 
 function FlowsheetItemTableRow({
@@ -226,6 +228,7 @@ export function AssessmentFlowsheetLayout({
   template: templateRaw,
   responses,
   setResponse,
+  className,
 }: Props) {
   const template = useMemo(
     () => prepareFlowsheetTemplate(templateRaw),
@@ -296,7 +299,12 @@ export function AssessmentFlowsheetLayout({
   }
 
   return (
-    <div className="flex min-h-[min(70vh,720px)] gap-0 overflow-hidden rounded-md border">
+    <div
+      className={cn(
+        "flex min-h-[min(70vh,720px)] max-h-full gap-0 overflow-x-clip overflow-y-visible rounded-md border",
+        className,
+      )}
+    >
       <aside className="bg-muted/40 flex w-52 shrink-0 flex-col border-r">
         <div className="border-b p-2">
           <Input
@@ -467,7 +475,7 @@ export function AssessmentFlowsheetLayout({
           className={cn(
             "border-border bg-muted/10 flex min-h-0 flex-col border-l transition-[width] duration-200 ease-out",
             wdlPanelItemId
-              ? "w-[min(22rem,40vw)] shrink-0"
+              ? "sticky top-4 max-h-[calc(100dvh-10rem)] w-[min(22rem,40vw)] shrink-0 self-start"
               : "w-0 shrink-0 overflow-hidden border-l-0",
           )}
           aria-hidden={!wdlPanelItemId}

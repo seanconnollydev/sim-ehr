@@ -227,12 +227,15 @@ export function AssessmentRunner({
       </AlertDialog>
 
       {layout === "flowsheet" ? (
-        <AssessmentFlowsheetLayout
-          key={flowsheetRemountKey}
-          template={template}
-          responses={document.responses}
-          setResponse={setResponse}
-        />
+        <div className="h-[min(min(70vh,720px),calc(100dvh-14rem))] w-full min-h-0">
+          <AssessmentFlowsheetLayout
+            key={flowsheetRemountKey}
+            className="h-full min-h-0"
+            template={template}
+            responses={document.responses}
+            setResponse={setResponse}
+          />
+        </div>
       ) : layout === "worksheet" ? (
         <AssessmentWorksheetLayout
           template={template}
