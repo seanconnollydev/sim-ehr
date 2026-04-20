@@ -136,15 +136,24 @@ export function AssessmentRunner({
     }
   }
 
-  function setResponse(itemId: string, value: AssessmentItemResponse["value"]) {
-    setDocument((d) => ({
-      ...d,
-      responses: {
-        ...d.responses,
-        [itemId]: { ...d.responses[itemId], value },
-      },
-      updatedAt: nowIso(),
-    }));
+  function setResponse(
+    itemId: string,
+    value: AssessmentItemResponse["value"],
+    clearItemIds?: string[],
+  ) {
+    setDocument((d) => {
+      const nextResponses = { ...d.responses, [itemId]: { ...d.responses[itemId], value } };
+      for (const id of clearItemIds ?? []) {
+        if (id !== itemId) {
+          delete nextResponses[id];
+        }
+      }
+      return {
+        ...d,
+        responses: nextResponses,
+        updatedAt: nowIso(),
+      };
+    });
   }
 
   function handleResetConfirm() {

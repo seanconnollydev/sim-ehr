@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type {
   AssessmentItem,
   AssessmentTemplate,
@@ -10,6 +10,7 @@ import { groupPathLabels } from "@/lib/assessments/group-path";
 import {
   FLOWSHEET_EXCEPTION_CHOICE_ID,
   findSectionRollupGate,
+  getFlowsheetItemIdsToClearWhenLeavingException,
   getWdlDefinitionForItem,
   isFlowsheetExceptionSelected,
   isFlowsheetWdlGateItem,
@@ -49,7 +50,11 @@ import {
 type Props = {
   template: AssessmentTemplate;
   responses: Record<string, AssessmentItemResponse>;
-  setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
+  setResponse: (
+    itemId: string,
+    value: AssessmentItemResponse["value"],
+    clearItemIds?: string[],
+  ) => void;
   /** Merged onto the root layout wrapper (e.g. height constraints from the parent page). */
   className?: string;
 };
@@ -58,11 +63,13 @@ function FlowsheetItemTableRow({
   item,
   responses,
   setResponse,
+  onWdlXChoiceChange,
   onOpenWdlPanel,
 }: {
   item: AssessmentItem;
   responses: Record<string, AssessmentItemResponse>;
   setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
+  onWdlXChoiceChange: (itemId: string, value: AssessmentItemResponse["value"]) => void;
   onOpenWdlPanel: (itemId: string) => void;
 }) {
   const selId = `flowsheet-${item.id}`;
@@ -110,7 +117,11 @@ function FlowsheetItemTableRow({
                   : (item.choices ?? [])
               }
               value={String(responses[item.id]?.value ?? "")}
-              onChange={(v) => setResponse(item.id, v)}
+              onChange={(v) =>
+                wdlXCombobox
+                  ? onWdlXChoiceChange(item.id, v)
+                  : setResponse(item.id, v)
+              }
               className="w-full min-w-0"
             />
           )}
@@ -269,18 +280,56 @@ export function AssessmentFlowsheetLayout({
     });
   }, [groups, railQuery, rootGroups]);
 
-  const blocks: { groupId: string; path: string[]; items: typeof items }[] =
-    [];
-  for (const item of items) {
-    const gid = item.groupId ?? "";
-    const path = groupPathLabels(groups, item.groupId);
-    const last = blocks[blocks.length - 1];
-    if (last && last.groupId === gid) {
-      last.items.push(item);
-    } else {
-      blocks.push({ groupId: gid, path, items: [item] });
+  const blocks = useMemo(() => {
+    const result: {
+      groupId: string;
+      path: string[];
+      items: typeof items;
+    }[] = [];
+    for (const item of items) {
+      const gid = item.groupId ?? "";
+      const path = groupPathLabels(groups, item.groupId);
+      const last = result[result.length - 1];
+      if (last && last.groupId === gid) {
+        last.items.push(item);
+      } else {
+        result.push({ groupId: gid, path, items: [item] });
+      }
     }
-  }
+    return result;
+  }, [items, groups]);
+
+  const blockByItemId = useMemo(() => {
+    const m = new Map<
+      string,
+      { groupId: string; path: string[]; items: typeof items }
+    >();
+    for (const b of blocks) {
+      for (const it of b.items) {
+        m.set(it.id, b);
+      }
+    }
+    return m;
+  }, [blocks]);
+
+  const handleFlowsheetResponse = useCallback(
+    (itemId: string, value: AssessmentItemResponse["value"]) => {
+      const block = blockByItemId.get(itemId);
+      if (!block) {
+        setResponse(itemId, value);
+        return;
+      }
+      const clearIds = getFlowsheetItemIdsToClearWhenLeavingException(
+        groups,
+        block,
+        itemId,
+        value,
+        responses,
+      );
+      setResponse(itemId, value, clearIds);
+    },
+    [blockByItemId, groups, responses, setResponse],
+  );
 
   function scrollToGroup(groupId: string) {
     const el = document.getElementById(`flowsheet-section-${groupId}`);
@@ -408,6 +457,7 @@ export function AssessmentFlowsheetLayout({
               const rowProps = {
                 responses,
                 setResponse,
+                onWdlXChoiceChange: handleFlowsheetResponse,
                 onOpenWdlPanel: setWdlPanelItemId,
               };
 

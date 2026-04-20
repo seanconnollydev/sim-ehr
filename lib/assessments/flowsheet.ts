@@ -103,6 +103,56 @@ export function findSectionRollupGate(
   );
 }
 
+/** One group’s contiguous items in template order (as used by the flowsheet layout). */
+export type FlowsheetBlock = {
+  groupId: string;
+  items: AssessmentItem[];
+};
+
+/**
+ * When a WDL/X combobox leaves exception (X) for WDL, returns response keys to remove for nested
+ * rows: section rollup clears all other items in the block; a row gate clears that segment’s details.
+ */
+export function getFlowsheetItemIdsToClearWhenLeavingException(
+  groups: AssessmentTemplate["groups"],
+  block: FlowsheetBlock,
+  itemId: string,
+  newValue: AssessmentItemResponse["value"],
+  responses: Record<string, AssessmentItemResponse>,
+): string[] {
+  const item = block.items.find((i) => i.id === itemId);
+  if (!item || !isFlowsheetWdlXComboboxItem(item)) {
+    return [];
+  }
+  const prevEx = isFlowsheetExceptionSelected(responses, itemId);
+  const nextIsException = newValue === FLOWSHEET_EXCEPTION_CHOICE_ID;
+  if (!prevEx || nextIsException) {
+    return [];
+  }
+
+  const groupLabel = groups?.find((g) => g.id === block.groupId)?.label ?? "";
+  const sectionGate = findSectionRollupGate(
+    block.groupId,
+    groupLabel,
+    block.items,
+  );
+
+  if (isSectionRollupGateItem(item, groupLabel)) {
+    return block.items.filter((i) => i.id !== itemId).map((i) => i.id);
+  }
+
+  if (isFlowsheetWdlGateItem(item)) {
+    const bodyItems = sectionGate
+      ? block.items.filter((i) => i.id !== sectionGate.id)
+      : block.items;
+    const segments = segmentFlowsheetRowItems(bodyItems);
+    const seg = segments.find((s) => s.gate?.id === itemId);
+    return seg ? seg.details.map((d) => d.id) : [];
+  }
+
+  return [];
+}
+
 export type FlowsheetRowSegment = {
   gate?: AssessmentItem;
   details: AssessmentItem[];
