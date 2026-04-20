@@ -51,6 +51,8 @@ export type AssessmentItem = {
   responseType: AssessmentResponseType;
   definedLimits?: DefinedLimits;
   choices?: AssessmentChoice[];
+  /** Flowsheet: exception option row — WDL vs X combobox (not a named `* WDL` gate). */
+  x_flowsheetLeafWdlX?: boolean;
   [key: string]: unknown;
 };
 

@@ -18,13 +18,25 @@ export function isFlowsheetWdlGateItem(item: AssessmentItem): boolean {
   return p.endsWith(" WDL");
 }
 
+/** Granular exception row under an expanded `* WDL` gate (prompt is the option label). */
+export function isFlowsheetLeafWdlXItem(item: AssessmentItem): boolean {
+  if (item.responseType !== "choice") {
+    return false;
+  }
+  return item.x_flowsheetLeafWdlX === true;
+}
+
+export function isFlowsheetWdlXComboboxItem(item: AssessmentItem): boolean {
+  return isFlowsheetWdlGateItem(item) || isFlowsheetLeafWdlXItem(item);
+}
+
 export function gateHasExceptionChoice(item: AssessmentItem): boolean {
   return (item.choices ?? []).some((c) => c.id === FLOWSHEET_EXCEPTION_CHOICE_ID);
 }
 
 /** Ensures the synthetic exception choice exists on gate items; idempotent. */
 export function ensureFlowsheetGateChoices(item: AssessmentItem): AssessmentItem {
-  if (!isFlowsheetWdlGateItem(item)) {
+  if (!isFlowsheetWdlXComboboxItem(item)) {
     return item;
   }
   const choices = [...(item.choices ?? [])];
@@ -69,6 +81,73 @@ export function findGateItemForGroup(
   return items.find((it) => it.groupId === groupId && isFlowsheetWdlGateItem(it));
 }
 
+/** Subsection rollup row, e.g. group label `Cardiac` → prompt `Cardiac WDL`. */
+export function isSectionRollupGateItem(
+  item: AssessmentItem,
+  groupLabel: string,
+): boolean {
+  if (!groupLabel) {
+    return false;
+  }
+  return item.prompt === `${groupLabel} WDL`;
+}
+
+export function findSectionRollupGate(
+  groupId: string,
+  groupLabel: string,
+  items: AssessmentItem[],
+): AssessmentItem | undefined {
+  return items.find(
+    (it) =>
+      it.groupId === groupId && isSectionRollupGateItem(it, groupLabel),
+  );
+}
+
+export type FlowsheetRowSegment = {
+  gate?: AssessmentItem;
+  details: AssessmentItem[];
+};
+
+/**
+ * Partition items (already excluding section rollup) into row-level segments:
+ * each gate is followed by its detail rows until the next gate.
+ */
+export function segmentFlowsheetRowItems(
+  itemsInTemplateOrder: AssessmentItem[],
+): FlowsheetRowSegment[] {
+  const segments: FlowsheetRowSegment[] = [];
+  let i = 0;
+  while (i < itemsInTemplateOrder.length) {
+    const item = itemsInTemplateOrder[i];
+    if (isFlowsheetWdlGateItem(item)) {
+      const gate = item;
+      const details: AssessmentItem[] = [];
+      i += 1;
+      while (
+        i < itemsInTemplateOrder.length &&
+        !isFlowsheetWdlGateItem(itemsInTemplateOrder[i])
+      ) {
+        details.push(itemsInTemplateOrder[i]);
+        i += 1;
+      }
+      segments.push({ gate, details });
+    } else {
+      const details: AssessmentItem[] = [];
+      while (
+        i < itemsInTemplateOrder.length &&
+        !isFlowsheetWdlGateItem(itemsInTemplateOrder[i])
+      ) {
+        details.push(itemsInTemplateOrder[i]);
+        i += 1;
+      }
+      if (details.length > 0) {
+        segments.push({ gate: undefined, details });
+      }
+    }
+  }
+  return segments;
+}
+
 /** Non-gate items in the same group (detail rows). */
 export function flowsheetDetailItemsForGroup(
   groupId: string,
@@ -98,11 +177,20 @@ const WDL_EQUALS_PREFIX = /^\s*WDL\s*=\s*/i;
  * Narrative shown in the WDL info panel: gate rows use non-exception choice label(s);
  * other choice rows use text after `WDL =` on a matching choice.
  */
+function narrativeAfterWdlEquals(label: string): string {
+  const t = label.trim();
+  const match = t.match(WDL_EQUALS_PREFIX);
+  if (match && match.index !== undefined) {
+    return t.slice(match.index + match[0].length).trim();
+  }
+  return t;
+}
+
 export function getWdlDefinitionForItem(item: AssessmentItem): string | null {
   if (isFlowsheetWdlGateItem(item)) {
     const parts = (item.choices ?? [])
       .filter((c) => c.id !== FLOWSHEET_EXCEPTION_CHOICE_ID)
-      .map((c) => c.label.trim())
+      .map((c) => narrativeAfterWdlEquals(c.label))
       .filter(Boolean);
     if (parts.length === 0) {
       return null;
@@ -112,9 +200,8 @@ export function getWdlDefinitionForItem(item: AssessmentItem): string | null {
   if (item.responseType === "choice" || item.responseType === "multiChoice") {
     for (const c of item.choices ?? []) {
       const label = c.label;
-      const match = label.match(WDL_EQUALS_PREFIX);
-      if (match && match.index !== undefined) {
-        return label.slice(match.index + match[0].length).trim();
+      if (WDL_EQUALS_PREFIX.test(label)) {
+        return narrativeAfterWdlEquals(label);
       }
     }
   }

@@ -40,6 +40,26 @@ function choiceId(itemId_, label, idx) {
   return `ch_${h16(["h2t", "choice", itemId_, label, String(idx)])}`;
 }
 
+/** Matches workbook lines that carry the narrative after `WDL=` (same idea as flowsheet.ts). */
+const WDL_EQUALS_PREFIX = /^\s*WDL\s*=\s*/i;
+
+/**
+ * @param {string[]} labels
+ * @returns {{ wdl: string[], exc: string[] }}
+ */
+function partitionWdlChoices(labels) {
+  const wdl = [];
+  const exc = [];
+  for (const label of labels) {
+    if (WDL_EQUALS_PREFIX.test(label)) {
+      wdl.push(label);
+    } else {
+      exc.push(label);
+    }
+  }
+  return { wdl, exc };
+}
+
 const LICENSE_NOTICE =
   "This document created by NKBDS H2T Task Force is licensed under the Creative Commons Attribution Non-Commercial Share Alike 4.0 International License in January, 2020. To view a summary of the license, go to https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode";
 
@@ -127,6 +147,58 @@ for (const key of sortedKeys) {
   if (choices.length === 0) {
     continue;
   }
+  if (conceptRow.endsWith(" WDL")) {
+    const baseConcept = conceptRow.replace(/ WDL$/, "");
+    const baseKey = `${bodySystem}\u0000${bodySub}\u0000${baseConcept}`;
+    if (byConcept.has(baseKey)) {
+      continue;
+    }
+  }
+
+  const gid = grpChild(bodySystem, bodySub);
+  const { wdl, exc } = partitionWdlChoices(choices);
+
+  if (wdl.length === 1 && exc.length >= 1) {
+    const gatePrompt = conceptRow.endsWith(" WDL") ? conceptRow : `${conceptRow} WDL`;
+    const gateId = itemId(bodySystem, bodySub, `${conceptRow}\0wdl_gate`);
+    const wdlLabel = wdl[0];
+    items.push({
+      id: gateId,
+      groupId: gid,
+      prompt: gatePrompt,
+      responseType: "choice",
+      definedLimits: { type: "none" },
+      choices: [
+        {
+          id: choiceId(gateId, wdlLabel, 0),
+          label: wdlLabel,
+        },
+      ],
+    });
+    for (const excLabel of exc) {
+      const leafId = itemId(
+        bodySystem,
+        bodySub,
+        `${conceptRow}\0leaf\0${excLabel}`,
+      );
+      items.push({
+        id: leafId,
+        groupId: gid,
+        prompt: excLabel,
+        responseType: "choice",
+        x_flowsheetLeafWdlX: true,
+        definedLimits: { type: "none" },
+        choices: [
+          {
+            id: choiceId(leafId, wdlLabel, 0),
+            label: wdlLabel,
+          },
+        ],
+      });
+    }
+    continue;
+  }
+
   const iid = itemId(bodySystem, bodySub, conceptRow);
   const choiceObjs = choices.map((label, idx) => ({
     id: choiceId(iid, label, idx),
@@ -134,7 +206,7 @@ for (const key of sortedKeys) {
   }));
   items.push({
     id: iid,
-    groupId: grpChild(bodySystem, bodySub),
+    groupId: gid,
     prompt: conceptRow,
     responseType: "choice",
     definedLimits: { type: "none" },

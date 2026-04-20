@@ -1,18 +1,21 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import type { AssessmentTemplate } from "@/lib/prototype-alpha/types/assessment-template";
+import type {
+  AssessmentItem,
+  AssessmentTemplate,
+} from "@/lib/prototype-alpha/types/assessment-template";
 import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
 import { groupPathLabels } from "@/lib/assessments/group-path";
 import {
   FLOWSHEET_EXCEPTION_CHOICE_ID,
-  findGateItemForGroup,
-  flowsheetDetailItemsForGroup,
-  flowsheetOrderedItemsForGroup,
+  findSectionRollupGate,
   getWdlDefinitionForItem,
   isFlowsheetExceptionSelected,
   isFlowsheetWdlGateItem,
+  isFlowsheetWdlXComboboxItem,
   prepareFlowsheetTemplate,
+  segmentFlowsheetRowItems,
   segmentWdlDefinitionText,
 } from "@/lib/assessments/flowsheet";
 import { AssessmentChoiceCombobox } from "@/components/student/assessment-choice-combobox";
@@ -49,36 +52,158 @@ type Props = {
   setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
 };
 
+function FlowsheetItemTableRow({
+  item,
+  responses,
+  setResponse,
+  onOpenWdlPanel,
+}: {
+  item: AssessmentItem;
+  responses: Record<string, AssessmentItemResponse>;
+  setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
+  onOpenWdlPanel: (itemId: string) => void;
+}) {
+  const selId = `flowsheet-${item.id}`;
+  const wdlDef = getWdlDefinitionForItem(item);
+  const showWdlInfo = isFlowsheetWdlGateItem(item) && Boolean(wdlDef);
+  const wdlXCombobox = isFlowsheetWdlXComboboxItem(item);
+  return (
+    <TableRow
+      className={cn(
+        "hover:bg-muted/30",
+        isFlowsheetWdlGateItem(item) && "bg-muted/20",
+      )}
+    >
+      <TableCell className="align-top py-1 pr-2 pl-3">
+        <Label
+          htmlFor={selId}
+          className="text-foreground text-xs leading-snug font-normal"
+        >
+          {item.prompt}
+          {wdlXCombobox && (
+            <span className="text-muted-foreground ml-1.5 text-[10px]">
+              (WDL / X)
+            </span>
+          )}
+        </Label>
+      </TableCell>
+      <TableCell className="align-top py-1 pr-3 pl-2">
+        <FlowsheetValueWithWdl
+          reserveIconSpace={item.responseType === "choice"}
+          showWdl={showWdlInfo}
+          ariaLabel={`View Within Defined Limits definition for ${item.prompt}`}
+          onOpenWdl={() => onOpenWdlPanel(item.id)}
+        >
+          {item.responseType === "choice" && (
+            <AssessmentChoiceCombobox
+              id={selId}
+              label={item.prompt}
+              choices={
+                wdlXCombobox
+                  ? (item.choices ?? []).map((ch) => ({
+                      ...ch,
+                      label:
+                        ch.id === FLOWSHEET_EXCEPTION_CHOICE_ID ? "X" : "WDL",
+                    }))
+                  : (item.choices ?? [])
+              }
+              value={String(responses[item.id]?.value ?? "")}
+              onChange={(v) => setResponse(item.id, v)}
+              className="w-full min-w-0"
+            />
+          )}
+          {item.responseType === "multiChoice" && (
+            <div className="flex max-w-full flex-col gap-1.5">
+              {(item.choices ?? []).map((ch) => {
+                const selected = Array.isArray(responses[item.id]?.value)
+                  ? (responses[item.id]?.value as string[])
+                  : [];
+                const checked = selected.includes(ch.id);
+                return (
+                  <label
+                    key={ch.id}
+                    className="flex items-start gap-2 text-xs leading-snug"
+                  >
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={(c) => {
+                        const next = new Set(selected);
+                        if (c === true) {
+                          next.add(ch.id);
+                        } else {
+                          next.delete(ch.id);
+                        }
+                        setResponse(item.id, [...next]);
+                      }}
+                    />
+                    <span>{ch.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {item.responseType === "boolean" && (
+            <label className="flex items-center gap-2 text-xs">
+              <Checkbox
+                id={selId}
+                checked={Boolean(responses[item.id]?.value === true)}
+                onCheckedChange={(c) => setResponse(item.id, c === true)}
+              />
+              Yes / within limits
+            </label>
+          )}
+          {item.responseType === "text" && (
+            <Textarea
+              id={selId}
+              rows={2}
+              className="min-h-[52px] resize-y px-2 py-1 text-xs"
+              value={String(responses[item.id]?.value ?? "")}
+              onChange={(e) => setResponse(item.id, e.target.value)}
+              aria-label={item.prompt}
+            />
+          )}
+        </FlowsheetValueWithWdl>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 function FlowsheetValueWithWdl({
+  reserveIconSpace,
   showWdl,
   ariaLabel,
   onOpenWdl,
   children,
 }: {
+  reserveIconSpace: boolean;
   showWdl: boolean;
   ariaLabel: string;
   onOpenWdl: () => void;
   children: ReactNode;
 }) {
-  if (!showWdl) {
+  if (!reserveIconSpace) {
     return <>{children}</>;
   }
   return (
     <div className="flex min-w-0 items-start gap-1">
       <div className="min-w-0 flex-1">{children}</div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="text-muted-foreground hover:text-foreground size-7 shrink-0"
-        aria-label={ariaLabel}
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenWdl();
-        }}
-      >
-        <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="size-4" />
-      </Button>
+      {showWdl ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground size-7 shrink-0"
+          aria-label={ariaLabel}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenWdl();
+          }}
+        >
+          <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="size-4" />
+        </Button>
+      ) : (
+        <div className="size-7 shrink-0" aria-hidden />
+      )}
     </div>
   );
 }
@@ -254,24 +379,29 @@ export function AssessmentFlowsheetLayout({
             </TableRow>
           </TableHeader>
           {blocks.map((block) => {
-              const gate = findGateItemForGroup(block.groupId, block.items);
-              const ordered = flowsheetOrderedItemsForGroup(
+              const groupLabel =
+                groups.find((g) => g.id === block.groupId)?.label ?? "";
+              const sectionGate = findSectionRollupGate(
                 block.groupId,
+                groupLabel,
                 block.items,
-                gate,
               );
-              const detailList = gate
-                ? flowsheetDetailItemsForGroup(
-                    block.groupId,
-                    block.items,
-                    gate.id,
-                  )
+              const bodyItems = sectionGate
+                ? block.items.filter((i) => i.id !== sectionGate.id)
                 : block.items;
-              const expanded =
-                gate && isFlowsheetExceptionSelected(responses, gate.id);
+              const sectionExpanded =
+                !sectionGate ||
+                isFlowsheetExceptionSelected(responses, sectionGate.id);
+              const rowSegments = segmentFlowsheetRowItems(bodyItems);
 
               const pathLine =
                 block.path.length > 0 ? block.path.join(" → ") : "—";
+
+              const rowProps = {
+                responses,
+                setResponse,
+                onOpenWdlPanel: setWdlPanelItemId,
+              };
 
               return (
                 <TableBody
@@ -287,130 +417,46 @@ export function AssessmentFlowsheetLayout({
                       {pathLine}
                     </TableCell>
                   </TableRow>
-                  {ordered.map((item) => {
-                    const isGate = gate && item.id === gate.id;
-                    const isDetail =
-                      gate &&
-                      !isGate &&
-                      detailList.some((d) => d.id === item.id);
-                    if (isDetail && !expanded) {
-                      return null;
-                    }
-
-                    const selId = `flowsheet-${item.id}`;
-                    const wdlDef = getWdlDefinitionForItem(item);
-                    const showWdlInfo = Boolean(wdlDef);
-                    return (
-                      <TableRow
-                        key={item.id}
-                        className={cn(
-                          "hover:bg-muted/30",
-                          isGate && "bg-muted/20",
-                        )}
-                      >
-                        <TableCell className="align-top py-1 pr-2 pl-3">
-                          <Label
-                            htmlFor={selId}
-                            className="text-foreground text-xs leading-snug font-normal"
-                          >
-                            {item.prompt}
-                            {isGate && (
-                              <span className="text-muted-foreground ml-1.5 text-[10px]">
-                                (WDL / X)
-                              </span>
-                            )}
-                          </Label>
-                        </TableCell>
-                        <TableCell className="align-top py-1 pr-3 pl-2">
-                          <FlowsheetValueWithWdl
-                            showWdl={showWdlInfo}
-                            ariaLabel={`View Within Defined Limits definition for ${item.prompt}`}
-                            onOpenWdl={() => setWdlPanelItemId(item.id)}
-                          >
-                            {item.responseType === "choice" && (
-                              <AssessmentChoiceCombobox
-                                id={selId}
-                                label={item.prompt}
-                                choices={
-                                  isGate
-                                    ? (item.choices ?? []).map((ch) => ({
-                                        ...ch,
-                                        label:
-                                          ch.id ===
-                                          FLOWSHEET_EXCEPTION_CHOICE_ID
-                                            ? "X"
-                                            : "WDL",
-                                      }))
-                                    : (item.choices ?? [])
-                                }
-                                value={String(responses[item.id]?.value ?? "")}
-                                onChange={(v) => setResponse(item.id, v)}
-                                className="w-full min-w-0"
-                              />
-                            )}
-                            {item.responseType === "multiChoice" && (
-                              <div className="flex max-w-full flex-col gap-1.5">
-                                {(item.choices ?? []).map((ch) => {
-                                  const selected = Array.isArray(
-                                    responses[item.id]?.value,
-                                  )
-                                    ? (responses[item.id]?.value as string[])
-                                    : [];
-                                  const checked = selected.includes(ch.id);
-                                  return (
-                                    <label
-                                      key={ch.id}
-                                      className="flex items-start gap-2 text-xs leading-snug"
-                                    >
-                                      <Checkbox
-                                        checked={checked}
-                                        onCheckedChange={(c) => {
-                                          const next = new Set(selected);
-                                          if (c === true) {
-                                            next.add(ch.id);
-                                          } else {
-                                            next.delete(ch.id);
-                                          }
-                                          setResponse(item.id, [...next]);
-                                        }}
-                                      />
-                                      <span>{ch.label}</span>
-                                    </label>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {item.responseType === "boolean" && (
-                              <label className="flex items-center gap-2 text-xs">
-                                <Checkbox
-                                  id={selId}
-                                  checked={Boolean(
-                                    responses[item.id]?.value === true,
-                                  )}
-                                  onCheckedChange={(c) =>
-                                    setResponse(item.id, c === true)
-                                  }
-                                />
-                                Yes / within limits
-                              </label>
-                            )}
-                            {item.responseType === "text" && (
-                              <Textarea
-                                id={selId}
-                                rows={2}
-                                className="min-h-[52px] resize-y px-2 py-1 text-xs"
-                                value={String(responses[item.id]?.value ?? "")}
-                                onChange={(e) =>
-                                  setResponse(item.id, e.target.value)
-                                }
-                                aria-label={item.prompt}
-                              />
-                            )}
-                          </FlowsheetValueWithWdl>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                  {sectionGate ? (
+                    <FlowsheetItemTableRow item={sectionGate} {...rowProps} />
+                  ) : null}
+                  {sectionExpanded
+                    ? rowSegments.flatMap((seg) => {
+                        if (seg.gate) {
+                          const out = [
+                            <FlowsheetItemTableRow
+                              key={seg.gate.id}
+                              item={seg.gate}
+                              {...rowProps}
+                            />,
+                          ];
+                          if (
+                            isFlowsheetExceptionSelected(
+                              responses,
+                              seg.gate.id,
+                            )
+                          ) {
+                            for (const d of seg.details) {
+                              out.push(
+                                <FlowsheetItemTableRow
+                                  key={d.id}
+                                  item={d}
+                                  {...rowProps}
+                                />,
+                              );
+                            }
+                          }
+                          return out;
+                        }
+                        return seg.details.map((d) => (
+                          <FlowsheetItemTableRow
+                            key={d.id}
+                            item={d}
+                            {...rowProps}
+                          />
+                        ));
+                      })
+                    : null}
                 </TableBody>
               );
             })}
@@ -449,7 +495,7 @@ export function AssessmentFlowsheetLayout({
                     <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
                   </Button>
                 </div>
-                {isFlowsheetWdlGateItem(wdlPanelItem) ? (
+                {isFlowsheetWdlXComboboxItem(wdlPanelItem) ? (
                   <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
                     WDL = Within defined limits. X = Exceptions to WDL.
                   </p>
