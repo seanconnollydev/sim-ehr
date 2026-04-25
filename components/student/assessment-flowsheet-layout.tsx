@@ -31,6 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -549,6 +550,62 @@ export function AssessmentFlowsheetLayout({
               </div>
               <ScrollArea className="min-h-0 flex-1">
                 <div className="p-3">
+                  {wdlPanelItem.responseType === "multiChoice" &&
+                  (wdlPanelItem.choices?.length ?? 0) > 0
+                    ? (() => {
+                        const selectedIds = Array.isArray(
+                          responses[wdlPanelItem.id]?.value,
+                        )
+                          ? (responses[wdlPanelItem.id]?.value as string[])
+                          : [];
+                        return (
+                          <>
+                            <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
+                              Options
+                            </p>
+                            <div
+                              className="mb-3 space-y-2"
+                              role="group"
+                              aria-label={`Options for ${wdlPanelItem.prompt}`}
+                            >
+                              {(wdlPanelItem.choices ?? []).map((ch) => {
+                                const checked = selectedIds.includes(ch.id);
+                                return (
+                                  <div
+                                    key={ch.id}
+                                    className="flex items-start gap-2"
+                                  >
+                                    <Checkbox
+                                      id={`flowsheet-wdl-${wdlPanelItem.id}-${ch.id}`}
+                                      checked={checked}
+                                      onCheckedChange={(c) => {
+                                        const next = new Set(selectedIds);
+                                        if (c === true) {
+                                          next.add(ch.id);
+                                        } else {
+                                          next.delete(ch.id);
+                                        }
+                                        setResponse(wdlPanelItem.id, [
+                                          ...next,
+                                        ]);
+                                      }}
+                                      className="mt-0.5"
+                                    />
+                                    <Label
+                                      htmlFor={`flowsheet-wdl-${wdlPanelItem.id}-${ch.id}`}
+                                      className="text-foreground text-xs font-normal leading-snug"
+                                    >
+                                      {ch.label}
+                                    </Label>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <Separator className="mb-3" />
+                          </>
+                        );
+                      })()
+                    : null}
                   <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
                     Row information
                   </p>
