@@ -1,19 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { AssessmentChoice } from "@/lib/prototype-alpha/types/assessment-template";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxItem,
+  ComboboxList,
+  ComboboxValue,
+  useComboboxAnchor,
+} from "@/components/ui/combobox";
 import { cn } from "@/lib/utils";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { UnfoldMoreIcon } from "@hugeicons/core-free-icons";
 
 type Props = {
   id: string;
@@ -25,20 +26,8 @@ type Props = {
   className?: string;
 };
 
-function displaySummary(
-  selectedIds: string[],
-  byId: Map<string, AssessmentChoice>,
-): string {
-  if (selectedIds.length === 0) {
-    return "Select…";
-  }
-  return selectedIds
-    .map((id) => byId.get(id)?.label ?? id)
-    .join("; ");
-}
-
 /**
- * Popover + checkbox list; closed trigger shows `; ` joined labels.
+ * Multiselect for flowsheet `multiChoice` items: shadcn Combobox (multiple) with chips.
  */
 export function AssessmentFlowsheetMultiselect({
   id,
@@ -49,81 +38,73 @@ export function AssessmentFlowsheetMultiselect({
   disabled,
   className,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const anchorRef = useComboboxAnchor();
   const byId = useMemo(
-    () => new Map(choices.map((c) => [c.id, c])),
+    () => new Map(choices.map((c) => [c.id, c] as const)),
     [choices],
   );
-  const summary = useMemo(
-    () => displaySummary(value, byId),
-    [value, byId],
-  );
-
+  const selectedChoices = useMemo((): AssessmentChoice[] => {
+    const out: AssessmentChoice[] = [];
+    for (const id_ of value) {
+      const ch = byId.get(id_);
+      if (ch) {
+        out.push(ch);
+      }
+    }
+    return out;
+  }, [value, byId]);
   return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
-      <PopoverTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            id={id}
-            disabled={disabled}
-            className={cn(
-              "h-auto min-h-7 w-full min-w-0 max-w-full justify-start gap-1.5 border px-2 py-0.5 font-normal shadow-none",
-              "text-foreground/90 [&:hover]:text-foreground/90",
-              className,
-            )}
-            aria-label={label}
-            aria-expanded={open}
-            aria-haspopup="dialog"
-          >
-            <span className="line-clamp-2 min-w-0 flex-1 text-left text-xs leading-snug break-words">
-              {summary}
-            </span>
-            <HugeiconsIcon
-              icon={UnfoldMoreIcon}
-              strokeWidth={2}
-              className="text-muted-foreground size-3.5 shrink-0"
-            />
-          </Button>
-        }
-      />
-      <PopoverContent
-        align="start"
-        className="w-[min(100vw-2rem,28rem)] max-w-[min(100vw-2rem,36rem)] min-w-0 p-0"
+    <div className={cn("w-full min-w-0", className)}>
+      <Combobox<AssessmentChoice, true>
+        items={choices}
+        multiple
+        value={selectedChoices}
+        onValueChange={(next) => onChange((next ?? []).map((c) => c.id))}
+        itemToStringValue={(c) => c.label}
+        isItemEqualToValue={(a, b) => a.id === b.id}
+        disabled={disabled}
+        modal={false}
       >
-        <ScrollArea className="h-[min(18rem,50dvh)]">
-          <ul className="flex flex-col gap-0.5 p-2">
-            {choices.map((ch) => {
-              const checked = value.includes(ch.id);
-              return (
-                <li key={ch.id}>
-                  <Label
-                    className="hover:bg-muted/60 flex cursor-pointer items-start gap-2.5 rounded-md px-1.5 py-1.5 text-xs leading-snug"
-                    htmlFor={`${id}-${ch.id}`}
-                  >
-                    <Checkbox
-                      id={`${id}-${ch.id}`}
-                      className="mt-0.5 shrink-0"
-                      checked={checked}
-                      onCheckedChange={(c) => {
-                        const next = new Set(value);
-                        if (c === true) {
-                          next.add(ch.id);
-                        } else {
-                          next.delete(ch.id);
-                        }
-                        onChange([...next]);
-                      }}
-                    />
-                    <span className="min-w-0 break-words">{ch.label}</span>
-                  </Label>
-                </li>
-              );
-            })}
-          </ul>
-        </ScrollArea>
-      </PopoverContent>
-    </Popover>
+        <ComboboxChips
+          ref={anchorRef}
+          className={cn(
+            "min-h-7 w-full min-w-0 max-w-full rounded-md border border-input/80 bg-input/30 px-2 py-0.5 text-xs",
+            "has-data-[slot=combobox-chip]:px-1.5",
+            "[&_[data-slot=combobox-chip]]:h-auto [&_[data-slot=combobox-chip]]:min-h-5.5",
+            "[&_[data-slot=combobox-chip]]:max-w-full [&_[data-slot=combobox-chip]]:whitespace-normal",
+          )}
+        >
+          <ComboboxValue>
+            {selectedChoices.map((ch) => (
+              <ComboboxChip key={ch.id}>{ch.label}</ComboboxChip>
+            ))}
+          </ComboboxValue>
+          <ComboboxChipsInput
+            id={id}
+            placeholder="Add…"
+            aria-label={label}
+            className="min-w-[4.5rem] text-xs"
+            disabled={disabled}
+          />
+        </ComboboxChips>
+        <ComboboxContent
+          anchor={anchorRef}
+          className="!w-[min(100vw-2rem,28rem)] !max-w-[min(100vw-2rem,36rem)] !min-w-[var(--anchor-width,100%)]"
+        >
+          <ComboboxEmpty>No items found.</ComboboxEmpty>
+          <ComboboxList className="max-h-[min(18rem,50dvh)]">
+            {(item: AssessmentChoice) => (
+              <ComboboxItem
+                key={item.id}
+                value={item}
+                className="items-start py-2 text-xs leading-snug whitespace-normal"
+              >
+                {item.label}
+              </ComboboxItem>
+            )}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+    </div>
   );
 }

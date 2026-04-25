@@ -1,3 +1,7 @@
+## Package management (npm only)
+
+Use **npm** for this repository: `npm install` for dependencies, and **npx** to run one-off CLIs (e.g. `npx shadcn@latest add <component>`). Do **not** use pnpm, yarn, or bun for installs or shadcn unless the user explicitly says otherwise.
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
