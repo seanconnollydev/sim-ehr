@@ -1,0 +1,149 @@
+"use client";
+
+import type { AssessmentItem } from "@/lib/prototype-alpha/types/assessment-template";
+import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
+import {
+  isFlowsheetWdlGateItem,
+  segmentWdlDefinitionText,
+} from "@/lib/assessments/flowsheet";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { Cancel01Icon } from "@hugeicons/core-free-icons";
+
+type Props = {
+  open: boolean;
+  item: AssessmentItem | null;
+  definition: string | null;
+  pathLine: string;
+  responses: Record<string, AssessmentItemResponse>;
+  setResponse: (
+    itemId: string,
+    value: AssessmentItemResponse["value"],
+  ) => void;
+  onClose: () => void;
+};
+
+export function AssessmentFlowsheetInfoPanel({
+  open,
+  item,
+  definition,
+  pathLine,
+  responses,
+  setResponse,
+  onClose,
+}: Props) {
+  return (
+    <aside
+      className={cn(
+        "border-border bg-muted/10 flex min-h-0 flex-col border-l transition-[width] duration-200 ease-out",
+        open
+          ? "sticky top-4 max-h-[calc(100dvh-10rem)] w-[min(22rem,40vw)] shrink-0 self-start"
+          : "w-0 shrink-0 overflow-hidden border-l-0",
+      )}
+      aria-hidden={!open}
+    >
+      {item && definition ? (
+        <div className="flex min-h-0 min-w-[min(22rem,40vw)] flex-1 flex-col">
+          <div className="border-b px-3 py-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-muted-foreground line-clamp-2 text-[10px] leading-tight">
+                  {pathLine || "—"}
+                </p>
+                <p className="text-foreground mt-0.5 text-xs font-semibold leading-snug">
+                  {item.prompt}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0"
+                aria-label="Close info panel"
+                onClick={onClose}
+              >
+                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+              </Button>
+            </div>
+            {isFlowsheetWdlGateItem(item) ? (
+              <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
+                WDL = Within defined limits. X = Exceptions to WDL.
+              </p>
+            ) : null}
+          </div>
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="p-3">
+              {item.responseType === "multiChoice" &&
+              (item.choices?.length ?? 0) > 0
+                ? (() => {
+                    const selectedIds = Array.isArray(
+                      responses[item.id]?.value,
+                    )
+                      ? (responses[item.id]?.value as string[])
+                      : [];
+                    return (
+                      <>
+                        <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
+                          Options
+                        </p>
+                        <div
+                          className="mb-3 space-y-2"
+                          role="group"
+                          aria-label={`Options for ${item.prompt}`}
+                        >
+                          {(item.choices ?? []).map((ch) => {
+                            const checked = selectedIds.includes(ch.id);
+                            return (
+                              <div
+                                key={ch.id}
+                                className="flex items-start gap-2"
+                              >
+                                <Checkbox
+                                  id={`flowsheet-info-${item.id}-${ch.id}`}
+                                  checked={checked}
+                                  onCheckedChange={(c) => {
+                                    const next = new Set(selectedIds);
+                                    if (c === true) {
+                                      next.add(ch.id);
+                                    } else {
+                                      next.delete(ch.id);
+                                    }
+                                    setResponse(item.id, [...next]);
+                                  }}
+                                  className="mt-0.5"
+                                />
+                                <Label
+                                  htmlFor={`flowsheet-info-${item.id}-${ch.id}`}
+                                  className="text-foreground text-xs font-normal leading-snug"
+                                >
+                                  {ch.label}
+                                </Label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <Separator className="mb-3" />
+                      </>
+                    );
+                  })()
+                : null}
+              <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
+                Row information
+              </p>
+              <ul className="text-foreground list-disc space-y-1.5 pl-4 text-xs leading-relaxed">
+                {segmentWdlDefinitionText(definition).map((segment, i) => (
+                  <li key={i}>{segment}</li>
+                ))}
+              </ul>
+            </div>
+          </ScrollArea>
+        </div>
+      ) : null}
+    </aside>
+  );
+}

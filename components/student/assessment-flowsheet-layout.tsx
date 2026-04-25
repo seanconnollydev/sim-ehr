@@ -17,9 +17,9 @@ import {
   isFlowsheetWdlXComboboxItem,
   prepareFlowsheetTemplate,
   segmentFlowsheetRowItems,
-  segmentWdlDefinitionText,
 } from "@/lib/assessments/flowsheet";
 import { AssessmentChoiceCombobox } from "@/components/student/assessment-choice-combobox";
+import { AssessmentFlowsheetInfoPanel } from "@/components/student/assessment-flowsheet-info-panel";
 import { AssessmentFlowsheetMultiselect } from "@/components/student/assessment-flowsheet-multiselect";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,7 +31,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -43,11 +42,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { HugeiconsIcon } from "@hugeicons/react";
-import {
-  ArrowRight01Icon,
-  Cancel01Icon,
-  SearchIcon,
-} from "@hugeicons/core-free-icons";
+import { ArrowRight01Icon, SearchIcon } from "@hugeicons/core-free-icons";
 
 type Props = {
   template: AssessmentTemplate;
@@ -66,13 +61,13 @@ function FlowsheetItemTableRow({
   responses,
   setResponse,
   onWdlXChoiceChange,
-  onOpenWdlPanel,
+  onOpenInfoPanel,
 }: {
   item: AssessmentItem;
   responses: Record<string, AssessmentItemResponse>;
   setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
   onWdlXChoiceChange: (itemId: string, value: AssessmentItemResponse["value"]) => void;
-  onOpenWdlPanel: (itemId: string) => void;
+  onOpenInfoPanel: (itemId: string) => void;
 }) {
   const selId = `flowsheet-${item.id}`;
   const wdlDef = getWdlDefinitionForItem(item);
@@ -105,8 +100,8 @@ function FlowsheetItemTableRow({
         <FlowsheetValueWithWdl
           reserveIconSpace={reserveForIcon}
           showWdl={showWdlInfo}
-          ariaLabel={`View Within Defined Limits definition for ${item.prompt}`}
-          onOpenWdl={() => onOpenWdlPanel(item.id)}
+          ariaLabel={`View row information for ${item.prompt}`}
+          onOpenInfo={() => onOpenInfoPanel(item.id)}
         >
           {item.responseType === "choice" && (
             <AssessmentChoiceCombobox
@@ -174,13 +169,13 @@ function FlowsheetValueWithWdl({
   reserveIconSpace,
   showWdl,
   ariaLabel,
-  onOpenWdl,
+  onOpenInfo,
   children,
 }: {
   reserveIconSpace: boolean;
   showWdl: boolean;
   ariaLabel: string;
-  onOpenWdl: () => void;
+  onOpenInfo: () => void;
   children: ReactNode;
 }) {
   if (!reserveIconSpace) {
@@ -198,7 +193,7 @@ function FlowsheetValueWithWdl({
           aria-label={ariaLabel}
           onClick={(e) => {
             e.stopPropagation();
-            onOpenWdl();
+            onOpenInfo();
           }}
         >
           <HugeiconsIcon icon={SearchIcon} strokeWidth={2} className="size-4" />
@@ -237,15 +232,15 @@ export function AssessmentFlowsheetLayout({
   const groups = useMemo(() => template.groups ?? [], [template.groups]);
   const items = template.items;
   const [railQuery, setRailQuery] = useState("");
-  const [wdlPanelItemId, setWdlPanelItemId] = useState<string | null>(null);
+  const [infoPanelItemId, setInfoPanelItemId] = useState<string | null>(null);
 
-  const wdlPanelItem = wdlPanelItemId
-    ? items.find((i) => i.id === wdlPanelItemId)
+  const infoPanelItem = infoPanelItemId
+    ? items.find((i) => i.id === infoPanelItemId)
     : undefined;
-  const wdlPanelDefinition =
-    wdlPanelItem && getWdlDefinitionForItem(wdlPanelItem);
-  const wdlPanelPathLine = wdlPanelItem
-    ? groupPathLabels(groups, wdlPanelItem.groupId).join(" → ")
+  const infoPanelDefinition =
+    infoPanelItem && getWdlDefinitionForItem(infoPanelItem);
+  const infoPanelPathLine = infoPanelItem
+    ? groupPathLabels(groups, infoPanelItem.groupId).join(" → ")
     : "";
 
   const rootGroups = useMemo(
@@ -447,7 +442,7 @@ export function AssessmentFlowsheetLayout({
                 responses,
                 setResponse,
                 onWdlXChoiceChange: handleFlowsheetResponse,
-                onOpenWdlPanel: setWdlPanelItemId,
+                onOpenInfoPanel: setInfoPanelItemId,
               };
 
               return (
@@ -510,117 +505,15 @@ export function AssessmentFlowsheetLayout({
         </Table>
         </div>
 
-        <aside
-          className={cn(
-            "border-border bg-muted/10 flex min-h-0 flex-col border-l transition-[width] duration-200 ease-out",
-            wdlPanelItemId
-              ? "sticky top-4 max-h-[calc(100dvh-10rem)] w-[min(22rem,40vw)] shrink-0 self-start"
-              : "w-0 shrink-0 overflow-hidden border-l-0",
-          )}
-          aria-hidden={!wdlPanelItemId}
-        >
-          {wdlPanelItem && wdlPanelDefinition ? (
-            <div className="flex min-h-0 min-w-[min(22rem,40vw)] flex-1 flex-col">
-              <div className="border-b px-3 py-2.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-muted-foreground line-clamp-2 text-[10px] leading-tight">
-                      {wdlPanelPathLine || "—"}
-                    </p>
-                    <p className="text-foreground mt-0.5 text-xs font-semibold leading-snug">
-                      {wdlPanelItem.prompt}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="shrink-0"
-                    aria-label="Close definition panel"
-                    onClick={() => setWdlPanelItemId(null)}
-                  >
-                    <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-                  </Button>
-                </div>
-                {isFlowsheetWdlGateItem(wdlPanelItem) ? (
-                  <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
-                    WDL = Within defined limits. X = Exceptions to WDL.
-                  </p>
-                ) : null}
-              </div>
-              <ScrollArea className="min-h-0 flex-1">
-                <div className="p-3">
-                  {wdlPanelItem.responseType === "multiChoice" &&
-                  (wdlPanelItem.choices?.length ?? 0) > 0
-                    ? (() => {
-                        const selectedIds = Array.isArray(
-                          responses[wdlPanelItem.id]?.value,
-                        )
-                          ? (responses[wdlPanelItem.id]?.value as string[])
-                          : [];
-                        return (
-                          <>
-                            <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
-                              Options
-                            </p>
-                            <div
-                              className="mb-3 space-y-2"
-                              role="group"
-                              aria-label={`Options for ${wdlPanelItem.prompt}`}
-                            >
-                              {(wdlPanelItem.choices ?? []).map((ch) => {
-                                const checked = selectedIds.includes(ch.id);
-                                return (
-                                  <div
-                                    key={ch.id}
-                                    className="flex items-start gap-2"
-                                  >
-                                    <Checkbox
-                                      id={`flowsheet-wdl-${wdlPanelItem.id}-${ch.id}`}
-                                      checked={checked}
-                                      onCheckedChange={(c) => {
-                                        const next = new Set(selectedIds);
-                                        if (c === true) {
-                                          next.add(ch.id);
-                                        } else {
-                                          next.delete(ch.id);
-                                        }
-                                        setResponse(wdlPanelItem.id, [
-                                          ...next,
-                                        ]);
-                                      }}
-                                      className="mt-0.5"
-                                    />
-                                    <Label
-                                      htmlFor={`flowsheet-wdl-${wdlPanelItem.id}-${ch.id}`}
-                                      className="text-foreground text-xs font-normal leading-snug"
-                                    >
-                                      {ch.label}
-                                    </Label>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            <Separator className="mb-3" />
-                          </>
-                        );
-                      })()
-                    : null}
-                  <p className="text-muted-foreground mb-2 text-[10px] font-medium tracking-wide uppercase">
-                    Row information
-                  </p>
-                  <ul className="text-foreground list-disc space-y-1.5 pl-4 text-xs leading-relaxed">
-                    {segmentWdlDefinitionText(wdlPanelDefinition).map(
-                      (segment, i) => (
-                        <li key={i}>{segment}</li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-              </ScrollArea>
-            </div>
-          ) : null}
-        </aside>
+        <AssessmentFlowsheetInfoPanel
+          open={Boolean(infoPanelItemId)}
+          item={infoPanelItem ?? null}
+          definition={infoPanelDefinition ?? null}
+          pathLine={infoPanelPathLine}
+          responses={responses}
+          setResponse={setResponse}
+          onClose={() => setInfoPanelItemId(null)}
+        />
       </div>
     </div>
   );
