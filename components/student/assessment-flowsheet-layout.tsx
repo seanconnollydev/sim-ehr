@@ -20,6 +20,7 @@ import {
   segmentWdlDefinitionText,
 } from "@/lib/assessments/flowsheet";
 import { AssessmentChoiceCombobox } from "@/components/student/assessment-choice-combobox";
+import { AssessmentFlowsheetMultiselect } from "@/components/student/assessment-flowsheet-multiselect";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -74,8 +75,11 @@ function FlowsheetItemTableRow({
 }) {
   const selId = `flowsheet-${item.id}`;
   const wdlDef = getWdlDefinitionForItem(item);
-  const showWdlInfo = isFlowsheetWdlGateItem(item) && Boolean(wdlDef);
+  const showWdlInfo = Boolean(wdlDef);
   const wdlXCombobox = isFlowsheetWdlXComboboxItem(item);
+  const reserveForIcon =
+    item.responseType === "choice" ||
+    (item.responseType === "multiChoice" && showWdlInfo);
   return (
     <TableRow
       className={cn(
@@ -98,7 +102,7 @@ function FlowsheetItemTableRow({
       </TableCell>
       <TableCell className="align-top py-1 pr-3 pl-2">
         <FlowsheetValueWithWdl
-          reserveIconSpace={item.responseType === "choice"}
+          reserveIconSpace={reserveForIcon}
           showWdl={showWdlInfo}
           ariaLabel={`View Within Defined Limits definition for ${item.prompt}`}
           onOpenWdl={() => onOpenWdlPanel(item.id)}
@@ -126,34 +130,18 @@ function FlowsheetItemTableRow({
             />
           )}
           {item.responseType === "multiChoice" && (
-            <div className="flex max-w-full flex-col gap-1.5">
-              {(item.choices ?? []).map((ch) => {
-                const selected = Array.isArray(responses[item.id]?.value)
+            <AssessmentFlowsheetMultiselect
+              id={selId}
+              label={item.prompt}
+              choices={item.choices ?? []}
+              value={
+                Array.isArray(responses[item.id]?.value)
                   ? (responses[item.id]?.value as string[])
-                  : [];
-                const checked = selected.includes(ch.id);
-                return (
-                  <label
-                    key={ch.id}
-                    className="flex items-start gap-2 text-xs leading-snug"
-                  >
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={(c) => {
-                        const next = new Set(selected);
-                        if (c === true) {
-                          next.add(ch.id);
-                        } else {
-                          next.delete(ch.id);
-                        }
-                        setResponse(item.id, [...next]);
-                      }}
-                    />
-                    <span>{ch.label}</span>
-                  </label>
-                );
-              })}
-            </div>
+                  : []
+              }
+              onChange={(ids) => setResponse(item.id, ids)}
+              className="w-full min-w-0"
+            />
           )}
           {item.responseType === "boolean" && (
             <label className="flex items-center gap-2 text-xs">
@@ -553,7 +541,7 @@ export function AssessmentFlowsheetLayout({
                     <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
                   </Button>
                 </div>
-                {isFlowsheetWdlXComboboxItem(wdlPanelItem) ? (
+                {isFlowsheetWdlGateItem(wdlPanelItem) ? (
                   <p className="text-muted-foreground mt-2 text-[10px] leading-snug">
                     WDL = Within defined limits. X = Exceptions to WDL.
                   </p>

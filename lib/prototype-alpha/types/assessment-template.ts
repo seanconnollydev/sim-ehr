@@ -51,8 +51,12 @@ export type AssessmentItem = {
   responseType: AssessmentResponseType;
   definedLimits?: DefinedLimits;
   choices?: AssessmentChoice[];
-  /** Flowsheet: exception option row — WDL vs X combobox (not a named `* WDL` gate). */
-  x_flowsheetLeafWdlX?: boolean;
+  /** Flowsheet: one subsection rollup row; WDL vs X, expands to exception `multiChoice` rows. */
+  x_flowsheetSectionRollup?: boolean;
+  /** Flowsheet: full subsection WDL narrative from workbook `Sub WDL` aggregate row (side panel when set). */
+  x_flowsheetSectionAggregateWdlDefinition?: string;
+  /** Flowsheet: WDL definition body for `multiChoice` exception rows (from `WDL=…` list choice; no `WDL` suffix in prompt). */
+  x_wdlListDefinition?: string;
   [key: string]: unknown;
 };
 

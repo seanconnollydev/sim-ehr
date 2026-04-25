@@ -18,16 +18,8 @@ export function isFlowsheetWdlGateItem(item: AssessmentItem): boolean {
   return p.endsWith(" WDL");
 }
 
-/** Granular exception row under an expanded `* WDL` gate (prompt is the option label). */
-export function isFlowsheetLeafWdlXItem(item: AssessmentItem): boolean {
-  if (item.responseType !== "choice") {
-    return false;
-  }
-  return item.x_flowsheetLeafWdlX === true;
-}
-
 export function isFlowsheetWdlXComboboxItem(item: AssessmentItem): boolean {
-  return isFlowsheetWdlGateItem(item) || isFlowsheetLeafWdlXItem(item);
+  return isFlowsheetWdlGateItem(item);
 }
 
 export function gateHasExceptionChoice(item: AssessmentItem): boolean {
@@ -81,25 +73,17 @@ export function findGateItemForGroup(
   return items.find((it) => it.groupId === groupId && isFlowsheetWdlGateItem(it));
 }
 
-/** Subsection rollup row, e.g. group label `Cardiac` → prompt `Cardiac WDL`. */
-export function isSectionRollupGateItem(
-  item: AssessmentItem,
-  groupLabel: string,
-): boolean {
-  if (!groupLabel) {
-    return false;
-  }
-  return item.prompt === `${groupLabel} WDL`;
+export function isSectionRollupGateItem(item: AssessmentItem): boolean {
+  return item.x_flowsheetSectionRollup === true;
 }
 
 export function findSectionRollupGate(
   groupId: string,
-  groupLabel: string,
+  _groupLabel: string,
   items: AssessmentItem[],
 ): AssessmentItem | undefined {
   return items.find(
-    (it) =>
-      it.groupId === groupId && isSectionRollupGateItem(it, groupLabel),
+    (it) => it.groupId === groupId && isSectionRollupGateItem(it),
   );
 }
 
@@ -137,7 +121,7 @@ export function getFlowsheetItemIdsToClearWhenLeavingException(
     block.items,
   );
 
-  if (isSectionRollupGateItem(item, groupLabel)) {
+  if (isSectionRollupGateItem(item)) {
     return block.items.filter((i) => i.id !== itemId).map((i) => i.id);
   }
 
@@ -237,6 +221,20 @@ function narrativeAfterWdlEquals(label: string): string {
 }
 
 export function getWdlDefinitionForItem(item: AssessmentItem): string | null {
+  if (
+    item.responseType === "multiChoice" &&
+    typeof item.x_wdlListDefinition === "string" &&
+    item.x_wdlListDefinition.trim() !== ""
+  ) {
+    return item.x_wdlListDefinition;
+  }
+  if (
+    item.x_flowsheetSectionRollup === true &&
+    typeof item.x_flowsheetSectionAggregateWdlDefinition === "string" &&
+    item.x_flowsheetSectionAggregateWdlDefinition.trim() !== ""
+  ) {
+    return item.x_flowsheetSectionAggregateWdlDefinition.trim();
+  }
   if (isFlowsheetWdlGateItem(item)) {
     const parts = (item.choices ?? [])
       .filter((c) => c.id !== FLOWSHEET_EXCEPTION_CHOICE_ID)

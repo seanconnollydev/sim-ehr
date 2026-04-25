@@ -32,8 +32,8 @@ function grpChild(bodySystem, bodySub) {
   return `grp_${h16(["h2t", "child", bodySystem, bodySub])}`;
 }
 
-function itemId(bodySystem, bodySub, conceptRow) {
-  return `itm_${h16(["h2t", "item", bodySystem, bodySub, conceptRow])}`;
+function itemId(bodySystem, bodySub, tag) {
+  return `itm_${h16(["h2t", "item", bodySystem, bodySub, tag])}`;
 }
 
 function choiceId(itemId_, label, idx) {
@@ -58,6 +58,18 @@ function partitionWdlChoices(labels) {
     }
   }
   return { wdl, exc };
+}
+
+/**
+ * @param {string} label
+ */
+function narrativeAfterWdlEquals(label) {
+  const t = label.trim();
+  const match = t.match(WDL_EQUALS_PREFIX);
+  if (match && match.index !== undefined) {
+    return t.slice(match.index + match[0].length).trim();
+  }
+  return t;
 }
 
 const LICENSE_NOTICE =
@@ -138,64 +150,176 @@ for (const pair of [...pairs].sort()) {
   });
 }
 
+/** @type {Map<string, { L: string[]; primaryConceptRow: string; head: string }>} */
+const wdlClusterByPair = new Map();
+for (const pair of pairs) {
+  const [bodySystem, bodySub] = pair.split("\u0000");
+  const L = [];
+  for (const k of sortedKeys) {
+    const p = k.split("\u0000");
+    if (p[0] !== bodySystem || p[1] !== bodySub) {
+      continue;
+    }
+    const { choices } = byConcept.get(k);
+    const { wdl, exc } = partitionWdlChoices(choices);
+    if (wdl.length === 1 && exc.length >= 1) {
+      L.push(k);
+    }
+  }
+  if (L.length === 0) {
+    continue;
+  }
+  L.sort((a, b) => byConcept.get(a).order - byConcept.get(b).order);
+  const preferredKey = `${bodySystem}\u0000${bodySub}\u0000${bodySub} WDL`;
+  /** WDL+exception row: stem after stripping ` WDL` matches subsection. */
+  const primaryWdlSubsectionInL = L.find((k) => {
+    const cr = k.split("\u0000")[2];
+    return cr.endsWith(" WDL") && cr.replace(/ WDL$/, "") === bodySub;
+  });
+  const primaryConceptRow = byConcept.has(preferredKey)
+    ? `${bodySub} WDL`
+    : primaryWdlSubsectionInL
+      ? primaryWdlSubsectionInL.split("\u0000")[2]
+      : L[0].split("\u0000")[2];
+  const head =
+    L.find((k) => k.split("\u0000")[2] === primaryConceptRow) ??
+    sortedKeys.find((sk) => L.includes(sk)) ??
+    L[0];
+  wdlClusterByPair.set(pair, { L, primaryConceptRow, head });
+}
+
+/** Subsection-level `Sub WDL` workbook rows (strip === bodySub): narrative for rollup WDL panel. */
+/** @type {Map<string, string>} */
+const aggregateWdlNarrativeByPair = new Map();
+for (const key of sortedKeys) {
+  const [bodySystem, bodySub, conceptRow] = key.split("\u0000");
+  if (!conceptRow.endsWith(" WDL")) {
+    continue;
+  }
+  if (conceptRow.replace(/ WDL$/, "") !== bodySub) {
+    continue;
+  }
+  const { choices } = byConcept.get(key);
+  const parts = choices.map((c) => String(c).trim()).filter(Boolean);
+  if (parts.length === 0) {
+    continue;
+  }
+  aggregateWdlNarrativeByPair.set(
+    `${bodySystem}\u0000${bodySub}`,
+    parts.join("\n\n"),
+  );
+}
+
+/** @type {Set<string>} */
+const keyEmitted = new Set();
+
 /** @type {Array<Record<string, unknown>>} */
 const items = [];
 
+/**
+ * WDL/exception cluster for one (body system, sub-system): one section gate + multiChoice per
+ * wdl+exception concept (row may or may not end with " WDL").
+ * @param {string} primaryConceptRow
+ * @param {string[]} wdlLKeys  ordered keys, each `body\0sub\0concept` with wdl+exc partition
+ */
+function pushWdlCluster(bodySystem, bodySub, primaryConceptRow, wdlLKeys) {
+  const gid = grpChild(bodySystem, bodySub);
+  const kPreferred = `${bodySystem}\u0000${bodySub}\u0000${primaryConceptRow}`;
+  const primaryKey =
+    wdlLKeys.find((k) => k.split("\u0000")[2] === primaryConceptRow) ??
+    (byConcept.has(kPreferred) ? kPreferred : wdlLKeys[0]);
+  const rawChoices = byConcept.get(primaryKey).choices;
+  const { wdl } = partitionWdlChoices(rawChoices);
+  const firstPlain = String(rawChoices[0] ?? "").trim();
+  const primaryWdlLabel = wdl[0] ?? (firstPlain ? `WDL= ${firstPlain}` : "");
+  const cr = primaryKey.split("\u0000")[2];
+  const gateId = itemId(
+    bodySystem,
+    bodySub,
+    `${cr}\0section_rollup`,
+  );
+
+  const gate = {
+    id: gateId,
+    groupId: gid,
+    prompt: cr.endsWith(" WDL") ? cr : `${cr} WDL`,
+    responseType: "choice",
+    x_flowsheetSectionRollup: true,
+    definedLimits: { type: "none" },
+    choices: [
+      {
+        id: choiceId(gateId, primaryWdlLabel, 0),
+        label: primaryWdlLabel,
+      },
+    ],
+  };
+  const pairKey = `${bodySystem}\u0000${bodySub}`;
+  const aggregateNarrative = aggregateWdlNarrativeByPair.get(pairKey);
+  if (aggregateNarrative) {
+    gate.x_flowsheetSectionAggregateWdlDefinition = aggregateNarrative;
+  }
+  items.push(gate);
+
+  for (const k of wdlLKeys) {
+    const conceptRow = k.split("\u0000")[2];
+    if (
+      conceptRow.endsWith(" WDL") &&
+      conceptRow.replace(/ WDL$/, "") === bodySub
+    ) {
+      keyEmitted.add(k);
+      continue;
+    }
+    const { choices: rawChoices } = byConcept.get(k);
+    const { wdl, exc } = partitionWdlChoices(rawChoices);
+    if (wdl.length < 1) {
+      throw new Error(`Expected WDL= row for key ${k}`);
+    }
+    const wdlNarrative = narrativeAfterWdlEquals(wdl[0]);
+    const mid = itemId(bodySystem, bodySub, `${conceptRow}\0exc_multi`);
+    const choiceObjs = exc.map((label, idx) => ({
+      id: choiceId(mid, label, idx),
+      label,
+    }));
+    const prompt = conceptRow.replace(/ WDL$/, "");
+    items.push({
+      id: mid,
+      groupId: gid,
+      prompt,
+      responseType: "multiChoice",
+      definedLimits: { type: "none" },
+      choices: choiceObjs,
+      x_wdlListDefinition: wdlNarrative,
+    });
+    keyEmitted.add(k);
+  }
+}
+
 for (const key of sortedKeys) {
+  if (keyEmitted.has(key)) {
+    continue;
+  }
   const [bodySystem, bodySub, conceptRow] = key.split("\u0000");
+  const pair = `${bodySystem}\u0000${bodySub}`;
+  const cl = wdlClusterByPair.get(pair);
+  if (cl && cl.L.includes(key) && key !== cl.head) {
+    continue;
+  }
+  if (cl && key === cl.head) {
+    const [bs, su] = pair.split("\u0000");
+    pushWdlCluster(bs, su, cl.primaryConceptRow, cl.L);
+    continue;
+  }
+
   const { choices } = byConcept.get(key);
   if (choices.length === 0) {
     continue;
   }
-  if (conceptRow.endsWith(" WDL")) {
-    const baseConcept = conceptRow.replace(/ WDL$/, "");
-    const baseKey = `${bodySystem}\u0000${bodySub}\u0000${baseConcept}`;
-    if (byConcept.has(baseKey)) {
-      continue;
-    }
-  }
-
-  const gid = grpChild(bodySystem, bodySub);
   const { wdl, exc } = partitionWdlChoices(choices);
-
   if (wdl.length === 1 && exc.length >= 1) {
-    const gatePrompt = conceptRow.endsWith(" WDL") ? conceptRow : `${conceptRow} WDL`;
-    const gateId = itemId(bodySystem, bodySub, `${conceptRow}\0wdl_gate`);
-    const wdlLabel = wdl[0];
-    items.push({
-      id: gateId,
-      groupId: gid,
-      prompt: gatePrompt,
-      responseType: "choice",
-      definedLimits: { type: "none" },
-      choices: [
-        {
-          id: choiceId(gateId, wdlLabel, 0),
-          label: wdlLabel,
-        },
-      ],
-    });
-    for (const excLabel of exc) {
-      const leafId = itemId(
-        bodySystem,
-        bodySub,
-        `${conceptRow}\0leaf\0${excLabel}`,
-      );
-      items.push({
-        id: leafId,
-        groupId: gid,
-        prompt: excLabel,
-        responseType: "choice",
-        x_flowsheetLeafWdlX: true,
-        definedLimits: { type: "none" },
-        choices: [
-          {
-            id: choiceId(leafId, wdlLabel, 0),
-            label: wdlLabel,
-          },
-        ],
-      });
-    }
+    pushWdlCluster(bodySystem, bodySub, conceptRow, [key]);
+    continue;
+  }
+  if (conceptRow.endsWith(" WDL")) {
     continue;
   }
 
@@ -206,12 +330,13 @@ for (const key of sortedKeys) {
   }));
   items.push({
     id: iid,
-    groupId: gid,
+    groupId: grpChild(bodySystem, bodySub),
     prompt: conceptRow,
     responseType: "choice",
     definedLimits: { type: "none" },
     choices: choiceObjs,
   });
+  keyEmitted.add(key);
 }
 
 const now = new Date().toISOString();
