@@ -210,6 +210,64 @@ for (const key of sortedKeys) {
   );
 }
 
+/**
+ * Subsection rollup workbook row: concept ends with ` WDL` and stem matches `bodySub`.
+ * @param {string} conceptRow
+ * @param {string} bodySub
+ */
+function isSubsectionWdlAggregateConcept(conceptRow, bodySub) {
+  return (
+    conceptRow.endsWith(" WDL") &&
+    conceptRow.replace(/ WDL$/, "") === bodySub
+  );
+}
+
+/** Pairs where WDL narrative and exceptions are on separate rows (no same-row wdl+exc). */
+for (const pair of pairs) {
+  if (wdlClusterByPair.has(pair)) {
+    continue;
+  }
+  const [bodySystem, bodySub] = pair.split("\u0000");
+  /** @type {string[]} */
+  const aggregateKeys = [];
+  /** @type {string[]} */
+  const exceptionOnlyKeys = [];
+  for (const k of sortedKeys) {
+    const p = k.split("\u0000");
+    if (p[0] !== bodySystem || p[1] !== bodySub) {
+      continue;
+    }
+    const conceptRow = p[2];
+    const { choices } = byConcept.get(k);
+    const { wdl, exc } = partitionWdlChoices(choices);
+    if (
+      isSubsectionWdlAggregateConcept(conceptRow, bodySub) &&
+      exc.length === 0 &&
+      wdl.length >= 1
+    ) {
+      aggregateKeys.push(k);
+    } else if (
+      wdl.length === 0 &&
+      exc.length >= 1 &&
+      !isSubsectionWdlAggregateConcept(conceptRow, bodySub)
+    ) {
+      exceptionOnlyKeys.push(k);
+    }
+  }
+  if (aggregateKeys.length < 1 || exceptionOnlyKeys.length < 1) {
+    continue;
+  }
+  aggregateKeys.sort((a, b) => byConcept.get(a).order - byConcept.get(b).order);
+  exceptionOnlyKeys.sort(
+    (a, b) => byConcept.get(a).order - byConcept.get(b).order,
+  );
+  const aggregateKey = aggregateKeys[0];
+  const primaryConceptRow = aggregateKey.split("\u0000")[2];
+  const L = [aggregateKey, ...exceptionOnlyKeys];
+  const head = aggregateKey;
+  wdlClusterByPair.set(pair, { L, primaryConceptRow, head });
+}
+
 /** @type {Set<string>} */
 const keyEmitted = new Set();
 
@@ -271,10 +329,17 @@ function pushWdlCluster(bodySystem, bodySub, primaryConceptRow, wdlLKeys) {
     }
     const { choices: rawChoices } = byConcept.get(k);
     const { wdl, exc } = partitionWdlChoices(rawChoices);
-    if (wdl.length < 1) {
-      throw new Error(`Expected WDL= row for key ${k}`);
+    let wdlNarrative;
+    if (wdl.length >= 1) {
+      wdlNarrative = narrativeAfterWdlEquals(wdl[0]);
+    } else {
+      const agg = aggregateWdlNarrativeByPair.get(pairKey);
+      if (!agg) {
+        throw new Error(`Expected WDL= row or subsection aggregate for key ${k}`);
+      }
+      const firstAgg = agg.split(/\n\n/).find((line) => line.trim()) ?? "";
+      wdlNarrative = narrativeAfterWdlEquals(firstAgg);
     }
-    const wdlNarrative = narrativeAfterWdlEquals(wdl[0]);
     const mid = itemId(bodySystem, bodySub, `${conceptRow}\0exc_multi`);
     const choiceObjs = exc.map((label, idx) => ({
       id: choiceId(mid, label, idx),
