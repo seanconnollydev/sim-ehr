@@ -62,6 +62,7 @@ function FlowsheetItemTableRow({
   setResponse,
   onWdlXChoiceChange,
   onOpenInfoPanel,
+  indentLevel = 0,
 }: {
   item: AssessmentItem;
   responses: Record<string, AssessmentItemResponse>;
@@ -71,6 +72,8 @@ function FlowsheetItemTableRow({
     value: AssessmentItemResponse["value"],
   ) => void;
   onOpenInfoPanel: (itemId: string) => void;
+  /** Left padding for nested rows (e.g. details under a WDL/X gate). */
+  indentLevel?: number;
 }) {
   const selId = `flowsheet-${item.id}`;
   const wdlDef = getWdlDefinitionForItem(item);
@@ -79,6 +82,10 @@ function FlowsheetItemTableRow({
   const reserveForIcon =
     item.responseType === "choice" ||
     (item.responseType === "multiChoice" && showWdlInfo);
+  const labelPl =
+    indentLevel <= 0 ? "pl-3" : indentLevel === 1 ? "pl-8" : "pl-11";
+  const valuePl =
+    indentLevel <= 0 ? "pl-2" : indentLevel === 1 ? "pl-7" : "pl-10";
   return (
     <TableRow
       className={cn(
@@ -86,7 +93,7 @@ function FlowsheetItemTableRow({
         isFlowsheetWdlGateItem(item) && "bg-muted/20",
       )}
     >
-      <TableCell className="align-top py-1 pr-2 pl-3">
+      <TableCell className={cn("align-top py-1 pr-2", labelPl)}>
         <Label
           htmlFor={selId}
           className="text-foreground text-xs leading-snug font-normal"
@@ -99,7 +106,7 @@ function FlowsheetItemTableRow({
           )}
         </Label>
       </TableCell>
-      <TableCell className="align-top py-1 pr-3 pl-2">
+      <TableCell className={cn("align-top py-1 pr-3", valuePl)}>
         <FlowsheetValueWithWdl
           reserveIconSpace={reserveForIcon}
           showWdl={showWdlInfo}
@@ -431,6 +438,9 @@ export function AssessmentFlowsheetLayout({
                 !sectionGate ||
                 isFlowsheetExceptionSelected(responses, sectionGate.id);
               const rowSegments = segmentFlowsheetRowItems(bodyItems);
+              /** Body rows render under optional section rollup; shift them right when expanded. */
+              const sectionBodyIndent =
+                Boolean(sectionGate) && sectionExpanded ? 1 : 0;
 
               const pathLine =
                 block.path.length > 0 ? block.path.join(" → ") : "—";
@@ -466,6 +476,7 @@ export function AssessmentFlowsheetLayout({
                             <FlowsheetItemTableRow
                               key={seg.gate.id}
                               item={seg.gate}
+                              indentLevel={sectionBodyIndent}
                               {...rowProps}
                             />,
                           ];
@@ -477,6 +488,7 @@ export function AssessmentFlowsheetLayout({
                                 <FlowsheetItemTableRow
                                   key={d.id}
                                   item={d}
+                                  indentLevel={sectionBodyIndent + 1}
                                   {...rowProps}
                                 />,
                               );
@@ -488,6 +500,7 @@ export function AssessmentFlowsheetLayout({
                           <FlowsheetItemTableRow
                             key={d.id}
                             item={d}
+                            indentLevel={sectionBodyIndent}
                             {...rowProps}
                           />
                         ));
