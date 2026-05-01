@@ -5,6 +5,9 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { submitAssessment } from "@/lib/actions/assessment-submission";
 import { isLocalOnlyAssessmentCaseStudy } from "@/lib/assessments/constants";
+import { prepareFlowsheetTemplate } from "@/lib/assessments/flowsheet";
+import { buildFlowsheetExportRows } from "@/lib/assessments/flowsheet-export";
+import { exportFlowsheetAssessmentPdf } from "@/lib/assessments/flowsheet-pdf";
 import { groupPathLabels } from "@/lib/assessments/group-path";
 import { useLocalAssessmentSubmission } from "@/lib/prototype-alpha/hooks/use-local-assessment-submission";
 import { nowIso } from "@/lib/prototype-alpha/ids";
@@ -38,6 +41,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { FileExportIcon } from "@hugeicons/core-free-icons";
 
 function hasMeaningfulResponses(
   responses: Record<string, AssessmentItemResponse>,
@@ -58,6 +63,46 @@ function hasMeaningfulResponses(
     }
   }
   return false;
+}
+
+function FlowsheetPdfExportButton({
+  disabled,
+  template: templateForExport,
+  responses,
+}: {
+  disabled: boolean;
+  template: AssessmentTemplate;
+  responses: Record<string, AssessmentItemResponse>;
+}) {
+  async function handleExportPdf() {
+    try {
+      const prepared = prepareFlowsheetTemplate(templateForExport);
+      const rows = buildFlowsheetExportRows(prepared, responses);
+      await exportFlowsheetAssessmentPdf({
+        title: templateForExport.title,
+        description: templateForExport.description?.trim() || undefined,
+        rows,
+        exportedAtLabel: new Date().toLocaleString(),
+      });
+      toast.success("PDF downloaded.");
+    } catch {
+      toast.error("Could not export PDF.");
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      disabled={disabled}
+      title="Export to PDF"
+      aria-label="Export to PDF"
+      onClick={() => void handleExportPdf()}
+    >
+      <HugeiconsIcon icon={FileExportIcon} strokeWidth={2} className="size-4" />
+    </Button>
+  );
 }
 
 type Props = {
@@ -205,12 +250,30 @@ export function AssessmentRunner({
             >
               Reset
             </Button>
-            <Button type="button" onClick={handleSubmit}>
-              {localOnlyAssessment ? "Done" : "Submit"}
-            </Button>
+            {layout === "flowsheet" && (
+              <FlowsheetPdfExportButton
+                disabled={!hasMeaningfulResponses(document.responses)}
+                template={template}
+                responses={document.responses}
+              />
+            )}
+            {!localOnlyAssessment && (
+              <Button type="button" onClick={handleSubmit}>
+                Submit
+              </Button>
+            )}
           </div>
         ) : (
-          <Badge>Submitted</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge>Submitted</Badge>
+            {layout === "flowsheet" && (
+              <FlowsheetPdfExportButton
+                disabled={!hasMeaningfulResponses(document.responses)}
+                template={template}
+                responses={document.responses}
+              />
+            )}
+          </div>
         )}
       </div>
 

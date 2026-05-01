@@ -8,6 +8,7 @@ import type {
 import type { AssessmentItemResponse } from "@/lib/prototype-alpha/types/assessment-submission";
 import { groupPathLabels } from "@/lib/assessments/group-path";
 import {
+  buildFlowsheetBlocks,
   FLOWSHEET_EXCEPTION_CHOICE_ID,
   findSectionRollupGate,
   getFlowsheetItemIdsToClearWhenLeavingException,
@@ -35,8 +36,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
-  TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
@@ -273,24 +272,10 @@ export function AssessmentFlowsheetLayout({
     });
   }, [groups, railQuery, rootGroups]);
 
-  const blocks = useMemo(() => {
-    const result: {
-      groupId: string;
-      path: string[];
-      items: typeof items;
-    }[] = [];
-    for (const item of items) {
-      const gid = item.groupId ?? "";
-      const path = groupPathLabels(groups, item.groupId);
-      const last = result[result.length - 1];
-      if (last && last.groupId === gid) {
-        last.items.push(item);
-      } else {
-        result.push({ groupId: gid, path, items: [item] });
-      }
-    }
-    return result;
-  }, [items, groups]);
+  const blocks = useMemo(
+    () => buildFlowsheetBlocks(items, groups),
+    [items, groups],
+  );
 
   const blockByItemId = useMemo(() => {
     const m = new Map<

@@ -1,5 +1,7 @@
+import { groupPathLabels } from "@/lib/assessments/group-path";
 import type {
   AssessmentChoice,
+  AssessmentGroup,
   AssessmentItem,
   AssessmentTemplate,
 } from "@/lib/prototype-alpha/types/assessment-template";
@@ -92,6 +94,33 @@ export type FlowsheetBlock = {
   groupId: string;
   items: AssessmentItem[];
 };
+
+/** Block with ancestry path labels (root → leaf), used by layout and PDF export. */
+export type FlowsheetLayoutBlock = FlowsheetBlock & {
+  path: string[];
+};
+
+/**
+ * Groups template items into contiguous blocks by `groupId`, preserving template order.
+ */
+export function buildFlowsheetBlocks(
+  items: AssessmentItem[],
+  groups: AssessmentGroup[] | undefined,
+): FlowsheetLayoutBlock[] {
+  const g = groups ?? [];
+  const result: FlowsheetLayoutBlock[] = [];
+  for (const item of items) {
+    const gid = item.groupId ?? "";
+    const path = groupPathLabels(g, item.groupId);
+    const last = result[result.length - 1];
+    if (last && last.groupId === gid) {
+      last.items.push(item);
+    } else {
+      result.push({ groupId: gid, path, items: [item] });
+    }
+  }
+  return result;
+}
 
 /**
  * When a WDL/X combobox leaves exception (X) for WDL, returns response keys to remove for nested
