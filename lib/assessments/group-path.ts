@@ -1,6 +1,10 @@
 import type { AssessmentGroup } from "@/lib/prototype-alpha/types/assessment-template";
 
-/** Labels from root → leaf for a group's ancestry. */
+/**
+ * Labels from root → leaf for a group's ancestry.
+ * Consecutive duplicate labels are collapsed so display strings stay readable when a nested group
+ * reuses its parent's name (semantic hierarchy is unchanged).
+ */
 export function groupPathLabels(
   groups: AssessmentGroup[],
   groupId: string | undefined,
@@ -19,5 +23,15 @@ export function groupPathLabels(
     path.push(g.label);
     gid = g.parentGroupId ?? null;
   }
-  return path.reverse();
+  return collapseConsecutiveEqual(path.reverse());
+}
+
+function collapseConsecutiveEqual(labels: string[]): string[] {
+  const out: string[] = [];
+  for (const label of labels) {
+    if (out.length === 0 || out[out.length - 1] !== label) {
+      out.push(label);
+    }
+  }
+  return out;
 }
