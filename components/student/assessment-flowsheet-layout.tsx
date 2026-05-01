@@ -66,7 +66,10 @@ function FlowsheetItemTableRow({
   item: AssessmentItem;
   responses: Record<string, AssessmentItemResponse>;
   setResponse: (itemId: string, value: AssessmentItemResponse["value"]) => void;
-  onWdlXChoiceChange: (itemId: string, value: AssessmentItemResponse["value"]) => void;
+  onWdlXChoiceChange: (
+    itemId: string,
+    value: AssessmentItemResponse["value"],
+  ) => void;
   onOpenInfoPanel: (itemId: string) => void;
 }) {
   const selId = `flowsheet-${item.id}`;
@@ -258,8 +261,7 @@ export function AssessmentFlowsheetLayout({
         return true;
       }
       return groups.some(
-        (g) =>
-          g.parentGroupId === r.id && g.label.toLowerCase().includes(q),
+        (g) => g.parentGroupId === r.id && g.label.toLowerCase().includes(q),
       );
     });
   }, [groups, railQuery, rootGroups]);
@@ -349,9 +351,14 @@ export function AssessmentFlowsheetLayout({
           />
         </div>
         <ScrollArea className="min-h-0 flex-1">
-          <nav className="flex flex-col gap-0.5 p-2" aria-label="Assessment categories">
+          <nav
+            className="flex flex-col gap-0.5 p-2"
+            aria-label="Assessment categories"
+          >
             {filteredRoots.map((r) => {
-              const childGroups = groups.filter((g) => g.parentGroupId === r.id);
+              const childGroups = groups.filter(
+                (g) => g.parentGroupId === r.id,
+              );
               if (childGroups.length === 0) {
                 return (
                   <button
@@ -408,18 +415,8 @@ export function AssessmentFlowsheetLayout({
 
       <div className="flex min-h-0 min-w-0 flex-1">
         <div className="bg-background min-w-0 flex-1 overflow-auto">
-        <Table className="table-fixed">
-          <TableHeader className="bg-background sticky top-0 z-20 shadow-[0_1px_0_0_hsl(var(--border))]">
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="text-muted-foreground w-[52%] py-1.5 text-xs font-semibold">
-                Row
-              </TableHead>
-              <TableHead className="text-muted-foreground py-1.5 text-xs font-semibold">
-                Value
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          {blocks.map((block) => {
+          <Table className="table-fixed">
+            {blocks.map((block) => {
               const groupLabel =
                 groups.find((g) => g.id === block.groupId)?.label ?? "";
               const sectionGate = findSectionRollupGate(
@@ -473,10 +470,7 @@ export function AssessmentFlowsheetLayout({
                             />,
                           ];
                           if (
-                            isFlowsheetExceptionSelected(
-                              responses,
-                              seg.gate.id,
-                            )
+                            isFlowsheetExceptionSelected(responses, seg.gate.id)
                           ) {
                             for (const d of seg.details) {
                               out.push(
@@ -502,7 +496,7 @@ export function AssessmentFlowsheetLayout({
                 </TableBody>
               );
             })}
-        </Table>
+          </Table>
         </div>
 
         <AssessmentFlowsheetInfoPanel
